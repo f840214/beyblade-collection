@@ -836,41 +836,83 @@ function renderPartDetail(type, code) {
 // ============================================================
 // 匯入匯出
 // ============================================================
+// gzip + base64 編解碼 (用於「短碼」格式)
+const SHORT_PREFIX = "BEYX1:";
+async function compressToShortCode(jsonStr) {
+  const stream = new Blob([jsonStr]).stream().pipeThrough(new CompressionStream("gzip"));
+  const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+  let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return SHORT_PREFIX + btoa(bin);
+}
+async function decompressFromShortCode(code) {
+  const b64 = code.replace(SHORT_PREFIX, "").trim();
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(stream).text();
+}
+
+let exportFormat = "json"; // json | short
+
 function openExport() {
-  const exportData = {
-    schema: "beyx_collection",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    summary: {
-      variants: Object.keys(state.owned).length,
-      parts: (() => { const op = ownedParts(); return { blade: op.blades.size, ratchet: op.ratchets.size, bit: op.bits.size }; })(),
-    },
-    owned: state.owned,
-  };
-  showModal("匯出收藏 JSON", `
-    <p style="color:var(--muted); margin-top:0;">複製下方內容，或按下載另存新檔。</p>
-    <textarea class="io" id="io-text" readonly>${JSON.stringify(exportData, null, 2)}</textarea>
+  showModal("匯出收藏", `
+    <div style="display:flex; gap:6px; margin-bottom:10px;">
+      <button id="fmt-json" class="${exportFormat === 'json' ? 'primary' : ''}" onclick="switchExportFormat('json')">📄 JSON (完整)</button>
+      <button id="fmt-short" class="${exportFormat === 'short' ? 'primary' : ''}" onclick="switchExportFormat('short')">📦 短碼 (壓縮)</button>
+    </div>
+    <p style="color:var(--muted); margin:0 0 6px; font-size:12px;" id="fmt-hint"></p>
+    <textarea class="io" id="io-text" readonly></textarea>
   `, [
     { label: "📋 複製", action: () => {
       navigator.clipboard.writeText(document.getElementById("io-text").value);
       alert("已複製到剪貼簿");
     }},
     { label: "💾 下載", primary: true, action: () => {
-      const blob = new Blob([document.getElementById("io-text").value], { type: "application/json" });
+      const ext = exportFormat === "json" ? "json" : "txt";
+      const blob = new Blob([document.getElementById("io-text").value], { type: "text/plain" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.${ext}`;
       a.click();
     }},
     { label: "關閉", action: closeModal },
   ]);
+  switchExportFormat(exportFormat);
+}
+
+async function switchExportFormat(fmt) {
+  exportFormat = fmt;
+  const btnJ = document.getElementById("fmt-json");
+  const btnS = document.getElementById("fmt-short");
+  if (btnJ && btnS) {
+    btnJ.classList.toggle("primary", fmt === "json");
+    btnS.classList.toggle("primary", fmt === "short");
+  }
+  const exportData = {
+    schema: "beyx_collection", version: 1,
+    exportedAt: new Date().toISOString(),
+    owned: state.owned,
+  };
+  const json = JSON.stringify(exportData, null, fmt === "json" ? 2 : 0);
+  const ta = document.getElementById("io-text");
+  const hint = document.getElementById("fmt-hint");
+  if (fmt === "json") {
+    ta.value = json;
+    hint.textContent = `JSON 格式，${json.length} 字元。可直接看內容、易於版本控制。`;
+  } else {
+    ta.value = "壓縮中…";
+    const code = await compressToShortCode(JSON.stringify({ schema: "beyx_collection", version: 1, owned: state.owned }));
+    ta.value = code;
+    hint.textContent = `短碼格式，${code.length} 字元 (壓縮率 ${(code.length / json.length * 100).toFixed(0)}%)。一行字串，方便分享/備份。`;
+  }
 }
 
 function openImport() {
-  showModal("匯入收藏 JSON", `
-    <p style="color:var(--muted); margin-top:0;">貼上之前匯出的 JSON 內容。也可以選擇檔案。</p>
-    <input type="file" accept=".json,application/json" onchange="loadFile(this.files[0])" style="margin-bottom:8px;">
-    <textarea class="io" id="io-text" placeholder='{"owned": {"BX-35#3": 1, ...}}'></textarea>
+  showModal("匯入收藏", `
+    <p style="color:var(--muted); margin-top:0;">貼上之前匯出的 <b>JSON 內容</b>或 <b>短碼</b>(以 BEYX1: 開頭)。也可以選擇檔案。</p>
+    <input type="file" accept=".json,.txt,application/json,text/plain" onchange="loadFile(this.files[0])" style="margin-bottom:8px;">
+    <textarea class="io" id="io-text" placeholder='{"owned": {"BX-35#3": 1, ...}}  或  BEYX1:H4sIAAAAAA...'></textarea>
     <div style="color: var(--warn); font-size: 12px; margin-top: 6px;" id="io-warn"></div>
   `, [
     { label: "🔁 取代", primary: true, action: () => doImport(true) },
@@ -886,18 +928,21 @@ function loadFile(f) {
   r.readAsText(f);
 }
 
-function doImport(replace) {
+async function doImport(replace) {
   const txt = document.getElementById("io-text").value.trim();
   if (!txt) return;
-  let data;
-  try { data = JSON.parse(txt); }
-  catch (e) {
-    document.getElementById("io-warn").textContent = "JSON 解析失敗：" + e.message;
-    return;
+  const warnEl = document.getElementById("io-warn");
+  let json = txt;
+  if (txt.startsWith(SHORT_PREFIX)) {
+    try { json = await decompressFromShortCode(txt); }
+    catch (e) { warnEl.textContent = "短碼解壓失敗：" + e.message; return; }
   }
+  let data;
+  try { data = JSON.parse(json); }
+  catch (e) { warnEl.textContent = "解析失敗：" + e.message; return; }
   const owned = data.owned || data;
   if (typeof owned !== "object") {
-    document.getElementById("io-warn").textContent = "找不到 owned 欄位";
+    warnEl.textContent = "找不到 owned 欄位";
     return;
   }
   const validIds = new Set(VARIANTS.map(v => v.id));
