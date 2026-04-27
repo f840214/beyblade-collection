@@ -100,8 +100,11 @@
     background: var(--panel2); padding: 1px 6px; border-radius: 10px;
   }
   .item.owned .qty { background: rgba(46,204,113,0.15); color: var(--owned); }
-  .item .check { font-family: monospace; color: var(--muted); }
+  .item .check { font-family: monospace; color: var(--muted); padding: 0 4px; border-radius: 50%; }
   .item.owned .check { color: var(--owned); }
+  .item .check.toggleable { cursor: pointer; }
+  .item .check.toggleable:hover { background: rgba(78,161,255,0.2); color: var(--accent); }
+  .item.owned .check.toggleable:hover { background: rgba(46,204,113,0.25); }
 
   .detail h2 { margin: 0 0 4px; font-size: 18px; }
   .detail .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
@@ -530,8 +533,15 @@ function renderProductList(q) {
       const bladesStr = blades.length === 0 ? ""
         : blades.length > 3 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
         : blades.join("、");
+      const isSingle = p.variants.length === 1;
+      const onlyV = isSingle ? p.variants[0] : null;
+      const checkChar = ownedV === total ? "●" : ownedV > 0 ? "◐" : "○";
+      const checkClick = isSingle
+        ? `event.stopPropagation(); setOwned('${onlyV.id}', ${isOwned(onlyV.id) ? 0 : 1})`
+        : "";
+      const checkTitle = isSingle ? "點此快速切換擁有/未擁有" : "";
       return `<div class="item ${cls}" onclick="select('product','${p.id}')">
-        <span class="check">${ownedV === total ? "●" : ownedV > 0 ? "◐" : "○"}</span>
+        <span class="check ${isSingle ? "toggleable" : ""}" ${checkClick ? `onclick="${checkClick}"` : ""} title="${checkTitle}">${checkChar}</span>
         <span class="name">${p.id}</span>
         <span style="color:var(--muted); font-size:11px;" title="${p.type}">${productTypeName(p.type)}</span>
         <span style="font-size:11px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${blades.join("、")}">${bladesStr}</span>
@@ -950,9 +960,9 @@ async function switchExportFormat(fmt) {
 function openImport() {
   showModal("匯入收藏", `
     <p style="color:var(--muted); margin-top:0;">貼上之前匯出的 <b>JSON 內容</b>或 <b>短碼</b>(以 BEYX1: 開頭)。也可以選擇檔案。</p>
-    <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
-      <button type="button" onclick="pasteIntoImport()">📋 從剪貼簿貼上</button>
-      <input type="file" accept=".json,.txt,application/json,text/plain" onchange="loadFile(this.files[0])" style="flex:1;">
+    <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+      <button type="button" onclick="pasteIntoImport()" style="white-space:nowrap; flex-shrink:0;">📋 從剪貼簿貼上</button>
+      <input type="file" accept=".json,.txt,application/json,text/plain" onchange="loadFile(this.files[0])" style="flex:1; min-width:140px;">
     </div>
     <textarea class="io" id="io-text" placeholder='{"owned": {"BX-35#3": 1, ...}}  或  BEYX1:H4sIAAAAAA...'></textarea>
     <div style="color: var(--warn); font-size: 12px; margin-top: 6px;" id="io-warn"></div>
