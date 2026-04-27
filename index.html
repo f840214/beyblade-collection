@@ -181,15 +181,32 @@
   .modal h2 { margin: 0 0 8px; font-size: 16px; }
   .modal .actions { margin-top: 10px; display: flex; gap: 6px; justify-content: flex-end; }
 
+  .mobile-back-bar { display: none; }
+
   @media (max-width: 800px) {
-    .layout { grid-template-columns: 1fr; height: auto; }
-    .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; }
+    .main {
+      display: none;
+      position: fixed; inset: 0;
+      background: var(--bg); z-index: 50;
+      padding-top: 0;
+    }
+    body.show-detail .sidebar { display: none; }
+    body.show-detail .main { display: block; }
+    .mobile-back-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky; top: 0; z-index: 10;
+      margin: -16px -20px 14px -20px;
+    }
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.20</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.21</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -442,6 +459,9 @@ function render() {
   renderStats();
   renderList();
   renderDetail();
+  // 手機版：當在「我的收藏」分頁，或 products/parts 已選中項目時，顯示 detail 全螢幕
+  const showMain = activeTab === "mine" || !!selected;
+  document.body.classList.toggle("show-detail", showMain);
 }
 
 function renderStats() {
@@ -617,10 +637,17 @@ function select(type, id) {
 
 function renderDetail() {
   const el = document.getElementById("detail");
-  if (activeTab === "mine") { el.innerHTML = renderCollection(); return; }
+  const back = `<div class="mobile-back-bar"><button onclick="goBack()">← 返回</button></div>`;
+  if (activeTab === "mine") { el.innerHTML = back + renderCollection(); return; }
   if (!selected) { el.innerHTML = `<div class="empty">← 從左側清單選一個項目開始</div>`; return; }
-  if (selected.type === "product") el.innerHTML = renderProductDetail(PRODUCTS[selected.id]);
-  else el.innerHTML = renderPartDetail(selected.type, selected.id);
+  if (selected.type === "product") el.innerHTML = back + renderProductDetail(PRODUCTS[selected.id]);
+  else el.innerHTML = back + renderPartDetail(selected.type, selected.id);
+}
+
+function goBack() {
+  if (activeTab === "mine") { switchTab("products"); return; }
+  selected = null;
+  render();
 }
 
 function renderCollection() {
@@ -923,7 +950,10 @@ async function switchExportFormat(fmt) {
 function openImport() {
   showModal("匯入收藏", `
     <p style="color:var(--muted); margin-top:0;">貼上之前匯出的 <b>JSON 內容</b>或 <b>短碼</b>(以 BEYX1: 開頭)。也可以選擇檔案。</p>
-    <input type="file" accept=".json,.txt,application/json,text/plain" onchange="loadFile(this.files[0])" style="margin-bottom:8px;">
+    <div style="display:flex; gap:6px; margin-bottom:8px; align-items:center;">
+      <button type="button" onclick="pasteIntoImport()">📋 從剪貼簿貼上</button>
+      <input type="file" accept=".json,.txt,application/json,text/plain" onchange="loadFile(this.files[0])" style="flex:1;">
+    </div>
     <textarea class="io" id="io-text" placeholder='{"owned": {"BX-35#3": 1, ...}}  或  BEYX1:H4sIAAAAAA...'></textarea>
     <div style="color: var(--warn); font-size: 12px; margin-top: 6px;" id="io-warn"></div>
   `, [
@@ -931,6 +961,19 @@ function openImport() {
     { label: "➕ 合併", action: () => doImport(false) },
     { label: "取消", action: closeModal },
   ]);
+}
+
+async function pasteIntoImport() {
+  const ta = document.getElementById("io-text");
+  const warn = document.getElementById("io-warn");
+  warn.textContent = "";
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) { ta.value = text; ta.focus(); }
+    else warn.textContent = "剪貼簿是空的";
+  } catch (e) {
+    warn.textContent = "無法讀取剪貼簿，請改用長按手動貼上 (" + e.message + ")";
+  }
 }
 
 function loadFile(f) {
