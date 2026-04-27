@@ -628,16 +628,18 @@ function renderCollection() {
         const sources = (PART_SOURCES[anchor.replace("mine-","")][code] || []);
         const ownedSources = sources.filter(v => isOwned(v.id));
         const display = nameFn(code, inf);
+        const headPrimary = display || code;
+        const headSub = display ? code : "";
         return `<div class="card">
           <div style="display:flex; align-items:baseline; gap:8px;">
-            <h3 style="margin:0; color:var(--text); font-family:monospace;">${code}</h3>
-            <span style="color: var(--muted); font-size:13px;">${display}</span>
+            <h3 style="margin:0; color:var(--text);">${headPrimary}</h3>
+            ${headSub ? `<span style="color: var(--muted); font-size:12px; font-family:monospace;">${headSub}</span>` : ""}
           </div>
           ${inf.desc ? `<div class="desc">${inf.desc}</div>` : ""}
           <div style="margin-top:8px;">
             <div style="color: var(--muted); font-size:11px; margin-bottom:4px;">來自（已擁有 ${ownedSources.length} / ${sources.length}）：</div>
             <div class="source-list">
-              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')">${v.productId} · ${v.raw}</span>`).join("")}
+              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')" title="${productTypeName(PRODUCTS[v.productId].type)}">${v.productId} · ${v.raw}</span>`).join("")}
             </div>
           </div>
         </div>`;
