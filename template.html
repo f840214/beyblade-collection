@@ -46,6 +46,8 @@
     background: var(--panel2); color: var(--text); border: 1px solid var(--border);
     padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
   }
+  /* 防止 iOS Safari 在點擊 input 時自動放大畫面 */
+  input, textarea, select { font-size: 16px; }
   button:hover { background: #2a3040; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #001833; }
   button.primary:hover { background: #6cb3ff; }
