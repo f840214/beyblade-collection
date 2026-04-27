@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.31</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.32</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -714,7 +714,10 @@ function renderPartList(q) {
         const info = sec.info(code);
         const chi = info.names ? info.names.chi || "" : "";
         const eng = info.names ? info.names.eng || "" : "";
-        if (!codeMatches(code, q) && !codeMatches(eng, q) && !chiMatches(chi, q)) return false;
+        if (codeMatches(code, q) || codeMatches(eng, q) || chiMatches(chi, q)) return true;
+        // 也用商品代號搜尋: ux09 → 找出 UX-09 包含的零件
+        const sources = PART_SOURCES[sec.key][code] || [];
+        return sources.some(v => codeMatches(v.productId, q));
       }
       return true;
     });

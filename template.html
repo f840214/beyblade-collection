@@ -714,7 +714,10 @@ function renderPartList(q) {
         const info = sec.info(code);
         const chi = info.names ? info.names.chi || "" : "";
         const eng = info.names ? info.names.eng || "" : "";
-        if (!codeMatches(code, q) && !codeMatches(eng, q) && !chiMatches(chi, q)) return false;
+        if (codeMatches(code, q) || codeMatches(eng, q) || chiMatches(chi, q)) return true;
+        // 也用商品代號搜尋: ux09 → 找出 UX-09 包含的零件
+        const sources = PART_SOURCES[sec.key][code] || [];
+        return sources.some(v => codeMatches(v.productId, q));
       }
       return true;
     });
