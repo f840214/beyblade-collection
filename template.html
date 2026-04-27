@@ -387,12 +387,15 @@ let filterOpts = {
   series: {},
 };
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
+let mineView = "detail"; // detail | table
 
 function toggleGroup(key) {
   if (collapsedGroups.has(key)) collapsedGroups.delete(key);
   else collapsedGroups.add(key);
   render();
 }
+
+function setMineView(v) { mineView = v; render(); }
 
 function switchTab(tab) {
   activeTab = tab;
@@ -688,13 +691,73 @@ function renderCollection() {
   const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
     (c, inf) => inf.names && inf.names.chi || "");
 
-  return `<div>
+  const toggle = `<div style="display:flex; gap:6px; margin-bottom:14px;">
+    <button class="${mineView === 'detail' ? 'primary' : ''}" onclick="setMineView('detail')">📋 卡片</button>
+    <button class="${mineView === 'table' ? 'primary' : ''}" onclick="setMineView('table')">📊 表格</button>
+  </div>`;
+
+  if (mineView === "table") return `<div>${toggle}${renderCollectionTable(q)}</div>`;
+
+  return `<div>${toggle}
     <h2 id="mine-products" style="margin-top:0;">🌀 陀螺戰士 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">${productsHtml}</div>
     ${bladeSec}
     ${ratchetSec}
     ${bitSec}
   </div>`;
+}
+
+function renderCollectionTable(q) {
+  const op = ownedParts();
+  const tableSec = (title, ownedSet, info, nameFn, key) => {
+    const all = [...ownedSet].sort();
+    const items = q ? all.filter(c => {
+      const inf = info(c);
+      const chi = inf.names ? inf.names.chi || "" : "";
+      const eng = inf.names ? inf.names.eng || "" : "";
+      return codeMatches(c, q) || codeMatches(eng, q) || chiMatches(chi, q);
+    }) : all;
+    const total = all.length;
+    if (!total) return `<h3 style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">0</span></h3>
+      <div class="empty" style="padding:14px;">還沒有任何擁有的零件</div>`;
+    return `<h3 style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">${total}</span></h3>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="text-align:left; font-size:11px; color:var(--muted); border-bottom:1px solid var(--border);">
+            <th style="padding:6px 8px; width: 38%;">中文名</th>
+            <th style="padding:6px 8px; width: 18%;">代號</th>
+            <th style="padding:6px 8px; width: 10%; text-align:right;">擁有</th>
+            <th style="padding:6px 8px;">來自</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(code => {
+            const inf = info(code);
+            const cn = nameFn(code, inf);
+            const sources = PART_SOURCES[key][code] || [];
+            const ownedSrc = sources.filter(v => isOwned(v.id));
+            const totalQty = ownedSrc.reduce((s, v) => s + ownedQty(v.id), 0);
+            const productIds = [...new Set(ownedSrc.map(v => v.productId))];
+            return `<tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px 8px;">${cn || "—"}</td>
+              <td style="padding:6px 8px; font-family:monospace; color:var(--muted); font-size:12px;">${code}</td>
+              <td style="padding:6px 8px; text-align:right; color:var(--owned); font-weight:600;">${totalQty}</td>
+              <td style="padding:6px 8px;">
+                <div class="source-list">
+                  ${productIds.map(pid => `<span class="src owned" onclick="switchTab('products'); select('product','${pid}')" title="${productTypeName(PRODUCTS[pid].type)}">${pid}</span>`).join("")}
+                </div>
+              </td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
+  };
+
+  return tableSec("⚔️ 戰刃", op.blades, bladeInfo,
+    (c, inf) => inf.isCx ? c : preferredChi(inf.names && inf.names.chi), "blade") +
+    tableSec("⚙️ 固鎖", op.ratchets, ratchetInfo, () => "", "ratchet") +
+    tableSec("🔩 軸", op.bits, bitInfo,
+    (c, inf) => preferredChi(inf.names && inf.names.chi), "bit");
 }
 
 function renderProductDetail(p) {
