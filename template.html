@@ -493,10 +493,17 @@ function renderProductList(q) {
       if (filterOpts.missingOnly && ownedV === total) return "";
       visible++;
       const cls = (ownedV === total ? "owned" : "") + (selected && selected.type==="product" && selected.id===p.id ? " selected" : "");
+      const blades = [...new Set(p.variants
+        .map(v => isEmptyPart(v.blade) ? null : (bladeInfo(v.blade).isCx ? v.blade : bladeName(v.blade)))
+        .filter(Boolean))];
+      const bladesStr = blades.length === 0 ? ""
+        : blades.length > 3 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
+        : blades.join("、");
       return `<div class="item ${cls}" onclick="select('product','${p.id}')">
         <span class="check">${ownedV === total ? "●" : ownedV > 0 ? "◐" : "○"}</span>
         <span class="name">${p.id}</span>
         <span style="color:var(--muted); font-size:11px;" title="${p.type}">${productTypeName(p.type)}</span>
+        <span style="font-size:11px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${blades.join("、")}">${bladesStr}</span>
         <span class="qty">${ownedV}/${total}</span>
       </div>`;
     }).join("");
