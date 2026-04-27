@@ -382,6 +382,13 @@ let filterOpts = {
   missingOnly: false,
   series: {},
 };
+const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
+
+function toggleGroup(key) {
+  if (collapsedGroups.has(key)) collapsedGroups.delete(key);
+  else collapsedGroups.add(key);
+  render();
+}
 
 function switchTab(tab) {
   activeTab = tab;
@@ -490,8 +497,10 @@ function renderProductList(q) {
       </div>`;
     }).join("");
     if (visible) {
-      html.push(`<div class="group">
-        <div class="group-head" onclick="this.parentElement.classList.toggle('collapsed')">
+      const gkey = "products:" + s;
+      const collapsed = collapsedGroups.has(gkey);
+      html.push(`<div class="group ${collapsed ? "collapsed" : ""}">
+        <div class="group-head" onclick="toggleGroup('${gkey}')">
           <span>${s} 系列</span>
           <span class="count">${visible} / ${items.length}</span>
         </div>
@@ -534,8 +543,10 @@ function renderPartList(q) {
       return true;
     });
     if (!filtered.length) return "";
-    return `<div class="group">
-      <div class="group-head" onclick="this.parentElement.classList.toggle('collapsed')">
+    const gkey = "parts:" + sec.key;
+    const collapsed = collapsedGroups.has(gkey);
+    return `<div class="group ${collapsed ? "collapsed" : ""}">
+      <div class="group-head" onclick="toggleGroup('${gkey}')">
         <span>${sec.title}</span>
         <span class="count">${[...sec.owned].filter(c => sec.items.includes(c)).length} / ${sec.items.length}</span>
       </div>
