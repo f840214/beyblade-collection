@@ -428,7 +428,7 @@ function renderStats() {
   const op = ownedParts();
   document.getElementById("stats").innerHTML =
     `已擁有 <b>${ownedCount}</b>/${totalVar} 變體 ・ ` +
-    `Blade <b>${op.blades.size}</b>/${ALL_BLADES.size} ・ ` +
+    `戰刃 <b>${op.blades.size}</b>/${ALL_BLADES.size} ・ ` +
     `固鎖 <b>${op.ratchets.size}</b>/${ALL_RATCHETS.size} ・ ` +
     `軸 <b>${op.bits.size}</b>/${ALL_BITS.size}`;
 }
@@ -450,9 +450,9 @@ function renderMineSidebar() {
   const ownedProdCount = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id))).length;
   const sections = [
     { key: "products", label: "🎁 商品", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
-    { key: "blade",    label: "⚔️ Blade 戰刃", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
-    { key: "ratchet",  label: "⚙️ 固鎖",       n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
-    { key: "bit",      label: "🔩 軸",         n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
+    { key: "blade",    label: "⚔️ 戰刃", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
+    { key: "ratchet",  label: "⚙️ 固鎖", n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
+    { key: "bit",      label: "🔩 軸",   n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
   ];
   return `<div class="group"><div class="group-body">` +
     sections.map(s => `<div class="item ${s.n > 0 ? "owned" : ""}" onclick="document.getElementById('${s.anchor}').scrollIntoView({behavior:'smooth', block:'start'})">
@@ -517,9 +517,9 @@ function variantMatches(v, q) {
 function renderPartList(q) {
   const op = ownedParts();
   const sections = [
-    { key: "blade", title: "Blade 戰刃", items: [...ALL_BLADES].sort(), info: bladeInfo, owned: op.blades },
-    { key: "ratchet", title: "固鎖", items: [...ALL_RATCHETS].sort(), info: ratchetInfo, owned: op.ratchets },
-    { key: "bit", title: "軸", items: [...ALL_BITS].sort(), info: bitInfo, owned: op.bits },
+    { key: "blade", title: "戰刃 Blade", items: [...ALL_BLADES].sort(), info: bladeInfo, owned: op.blades },
+    { key: "ratchet", title: "固鎖 Ratchet", items: [...ALL_RATCHETS].sort(), info: ratchetInfo, owned: op.ratchets },
+    { key: "bit", title: "軸 Bit", items: [...ALL_BITS].sort(), info: bitInfo, owned: op.bits },
   ];
   return sections.map(sec => {
     const filtered = sec.items.filter(code => {
@@ -544,9 +544,12 @@ function renderPartList(q) {
           const info = sec.info(code);
           const isO = sec.owned.has(code);
           const cls = (isO ? "owned" : "") + (selected && selected.type === sec.key && selected.id === code ? " selected" : "");
-          const display = sec.key === "ratchet" ? code :
-                          sec.key === "blade" ? `${code} ${info.isCx ? "" : "<span style='color:var(--muted)'>" + (bladeName(code)) + "</span>"}` :
-                          `${code} <span style='color:var(--muted)'>${bitName(code)}</span>`;
+          const cn = sec.key === "ratchet" ? "" :
+                     sec.key === "blade" ? (info.isCx ? "" : bladeName(code)) :
+                     bitName(code);
+          const display = cn
+            ? `${cn} <span style='color:var(--muted); font-family:monospace; font-size:11px;'>${code}</span>`
+            : `<span style='font-family:monospace;'>${code}</span>`;
           return `<div class="item ${cls}" onclick="select('${sec.key}','${escapeAttr(code)}')">
             <span class="check">${isO ? "●" : "○"}</span>
             <span class="name">${display}</span>
@@ -587,17 +590,21 @@ function renderCollection() {
           const ownedVars = p.variants.filter(v => isOwned(v.id));
           return `<div class="card" style="cursor:pointer" onclick="switchTab('products'); select('product','${p.id}')">
             <div style="display:flex; align-items:baseline; gap:8px;">
-              <h3 style="margin:0; color: var(--text);">${p.id}</h3>
-              <span style="color:var(--muted); font-size:12px;" title="${p.type}">${productTypeName(p.type)}</span>
+              <h3 style="margin:0; color: var(--text);">${productTypeName(p.type)}</h3>
+              <span style="color:var(--muted); font-size:12px; font-family:monospace;">${p.id}</span>
               <span class="pill owned" style="margin-left:auto;">${ownedVars.length}/${p.variants.length}</span>
             </div>
-            <div style="margin-top:6px; color: var(--muted); font-size:12px;">
+            <div style="margin-top:6px; font-size:12px;">
               ${ownedVars.map(v => {
-                const showB = isEmptyPart(v.blade) ? "—" : v.blade;
-                const showR = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
-                const showI = isEmptyPart(v.bit) ? "—" : v.bit;
+                const bChi = isEmptyPart(v.blade) ? "—" : (bladeInfo(v.blade).isCx ? v.blade : bladeName(v.blade) || v.blade);
+                const rDisp = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
+                const bitC = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
+                const codeStr = [isEmptyPart(v.blade)?"—":v.blade, rDisp, isEmptyPart(v.bit)?"—":v.bit].join(" ");
                 const qty = ownedQty(v.id);
-                return `<div>${showB} ${showR} ${showI}${qty > 1 ? ` ×${qty}` : ""}</div>`;
+                return `<div style="margin-bottom:4px;">
+                  <div>${bChi} · ${rDisp} · ${bitC}${qty > 1 ? ` <span style="color:var(--muted)">×${qty}</span>` : ""}</div>
+                  <div style="color:var(--muted); font-size:11px; font-family:monospace;">${codeStr}</div>
+                </div>`;
               }).join("")}
             </div>
           </div>`;
@@ -637,14 +644,14 @@ function renderCollection() {
       }).join("");
   };
 
-  const bladeSec = partSection("⚔️ Blade 戰刃", "mine-blade", op.blades, bladeInfo,
-    (c, inf) => inf.isCx ? "(CX 組合)" : (inf.names && inf.names.chi || ""));
-  const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, (c) => c);
+  const bladeSec = partSection("⚔️ 戰刃", "mine-blade", op.blades, bladeInfo,
+    (c, inf) => inf.isCx ? "" : (inf.names && inf.names.chi ? inf.names.chi.split(/\s+/)[0] : ""));
+  const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, () => "");
   const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
     (c, inf) => inf.names && inf.names.chi || "");
 
   return `<div>
-    <h2 id="mine-products" style="margin-top:0;">🎁 我擁有的商品 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
+    <h2 id="mine-products" style="margin-top:0;">🎁 我的商品 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">${productsHtml}</div>
     ${bladeSec}
     ${ratchetSec}
@@ -656,22 +663,27 @@ function renderProductDetail(p) {
   if (!p) return `<div class="empty">找不到商品</div>`;
   const ownedV = p.variants.filter(v => isOwned(v.id)).length;
   const variants = p.variants.map((v, i) => {
-    const showBlade   = isEmptyPart(v.blade)   ? "—" : v.blade;
-    const showRatchet = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
-    const showBit     = isEmptyPart(v.bit)     ? "—" : v.bit;
+    const codeStr = [
+      isEmptyPart(v.blade) ? "—" : v.blade,
+      isEmptyPart(v.ratchet) ? "—" : v.ratchet,
+      isEmptyPart(v.bit) ? "—" : v.bit,
+    ].join(" ");
     const blade = isEmptyPart(v.blade) ? null : bladeInfo(v.blade);
-    const bChi = blade ? (blade.isCx ? "" : bladeName(v.blade)) : "";
-    const bitChi = isEmptyPart(v.bit) ? "" : bitName(v.bit);
-    const subParts = [bChi, !isEmptyPart(v.ratchet) ? v.ratchet : "", bitChi].filter(Boolean).join(" · ") || "(單獨零件包)";
-    const get = v.opts.get;
-    const coat = v.opts.coat;
+    const bChi = blade ? (blade.isCx ? v.blade : bladeName(v.blade) || v.blade) : "—";
+    const ratchetDisplay = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
+    const bitChi = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
+    const cnDisplay = `${bChi} · ${ratchetDisplay} · ${bitChi}`;
+    const meta = [];
+    if (v.opts.get)  meta.push(`每箱 ${v.opts.get} 盒`);
+    if (v.opts.coat) meta.push(`配色 ${v.opts.coat}`);
     const qty = ownedQty(v.id);
     const owned = qty > 0;
     return `<div class="variant ${owned ? "owned" : ""}">
       <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       <div>
-        <div class="vbey">${showBlade} ${showRatchet} ${showBit}</div>
-        <div class="vparts">${subParts}${get ? ` · 每箱 ${get} 盒` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
+        <div class="vbey">${cnDisplay}</div>
+        <div class="vparts" style="font-family:monospace;">${codeStr}</div>
+        ${meta.length ? `<div class="vparts">${meta.join(" · ")}</div>` : ""}
       </div>
       <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
       <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
@@ -692,13 +704,14 @@ function renderPartDetail(type, code) {
   const names = info.names || {};
   const attr = info.attr || [];
   const stat = info.stat || [];
+  const primary = names.chi ? names.chi.split(/\s+/)[0] : code;
   return `<div>
     <h2>
-      ${code}
-      <span style="color:var(--muted); font-size: 14px;">${names.chi || ""}</span>
+      ${primary}
       <span class="pill ${owned ? "owned" : "missing"}">${owned ? "已擁有" : "缺少"}</span>
     </h2>
-    <div class="sub">${type === "blade" ? "Blade 戰刃" : type === "ratchet" ? "固鎖" : "軸"}</div>
+    <div class="sub" style="font-family:monospace;">${code}</div>
+    <div class="sub">${type === "blade" ? "戰刃 Blade" : type === "ratchet" ? "固鎖 Ratchet" : "軸 Bit"}</div>
 
     <div class="card">
       <h3>零件資訊</h3>
