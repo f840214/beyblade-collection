@@ -305,16 +305,20 @@ function productTypeName(code) {
   return isHasbro ? main + "・異色版" : main;
 }
 
+// chi 欄位格式為「港譯 台譯」(以空白分隔)，取最後一段=台譯
+function preferredChi(c) {
+  if (!c) return "";
+  const tokens = c.split(/\s+/).filter(Boolean);
+  return tokens[tokens.length - 1] || "";
+}
 function bladeName(code) {
   const b = bladeInfo(code);
   if (b.isCx) return code;
-  const c = (b.names && b.names.chi) || "";
-  return c ? c.split(/\s+/)[0] : code;
+  return preferredChi(b.names && b.names.chi) || code;
 }
 function bitName(code) {
   const b = bitInfo(code);
-  const c = (b.names && b.names.chi) || "";
-  return c || code;
+  return preferredChi(b.names && b.names.chi) || code;
 }
 
 // 由所有資料統計可獲得的零件 (排除 "/" 等占位符)
@@ -514,9 +518,11 @@ function renderProductList(q) {
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 
 // 代號用「字界開頭」比對 (R 不會撈到 DrSt)，中文用子字串
+// 同時把連字符忽略 (UX09 可以命中 UX-09)
 function codeMatches(text, q) {
   if (!text) return false;
-  return new RegExp("(?:^|[^A-Za-z0-9])" + escapeRegex(q), "i").test(text);
+  const norm = s => s.replace(/-/g, "");
+  return new RegExp("(?:^|[^A-Za-z0-9])" + escapeRegex(norm(q)), "i").test(norm(text));
 }
 function chiMatches(text, q) {
   return text && text.toLowerCase().includes(q.toLowerCase());
@@ -670,7 +676,7 @@ function renderCollection() {
   };
 
   const bladeSec = partSection("⚔️ 戰刃", "mine-blade", op.blades, bladeInfo,
-    (c, inf) => inf.isCx ? "" : (inf.names && inf.names.chi ? inf.names.chi.split(/\s+/)[0] : ""));
+    (c, inf) => inf.isCx ? "" : preferredChi(inf.names && inf.names.chi));
   const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, () => "");
   const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
     (c, inf) => inf.names && inf.names.chi || "");
@@ -729,7 +735,7 @@ function renderPartDetail(type, code) {
   const names = info.names || {};
   const attr = info.attr || [];
   const stat = info.stat || [];
-  const primary = names.chi ? names.chi.split(/\s+/)[0] : code;
+  const primary = preferredChi(names.chi) || code;
   return `<div>
     <h2>
       ${primary}
