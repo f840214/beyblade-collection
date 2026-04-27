@@ -181,7 +181,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.17</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.18</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -845,12 +845,16 @@ async function compressToShortCode(jsonStr) {
   return SHORT_PREFIX + btoa(bin);
 }
 async function decompressFromShortCode(code) {
-  const b64 = code.replace(SHORT_PREFIX, "").trim();
+  // iOS 會把前綴轉小寫；用 regex 不分大小寫剝掉任何 "xxxN:" 開頭
+  const b64 = code.replace(/^[A-Za-z]+\d*:/i, "").replace(/\s+/g, "");
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   return await new Response(stream).text();
+}
+function looksLikeShortCode(s) {
+  return /^[A-Za-z]+\d*:/i.test(s) || (!s.startsWith("{") && /^[A-Za-z0-9+/=\s]+$/.test(s));
 }
 
 let exportFormat = "json"; // json | short
@@ -933,7 +937,7 @@ async function doImport(replace) {
   if (!txt) return;
   const warnEl = document.getElementById("io-warn");
   let json = txt;
-  if (txt.startsWith(SHORT_PREFIX)) {
+  if (looksLikeShortCode(txt)) {
     try { json = await decompressFromShortCode(txt); }
     catch (e) { warnEl.textContent = "短碼解壓失敗：" + e.message; return; }
   }
