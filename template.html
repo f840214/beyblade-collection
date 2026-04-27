@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>Beyblade X 收藏管理</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel2: #1f232c;
+    --border: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #8a93a3;
+    --accent: #4ea1ff;
+    --accent2: #7cf;
+    --owned: #2ecc71;
+    --missing: #ff6b6b;
+    --warn: #f5a623;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    font-size: 14px; line-height: 1.45;
+  }
+  header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--panel);
+  }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header .stats { color: var(--muted); font-size: 12px; }
+  header .stats b { color: var(--text); font-weight: 600; }
+  header .actions { margin-left: auto; display: flex; gap: 6px; }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  button:hover { background: #2a3040; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #001833; }
+  button.primary:hover { background: #6cb3ff; }
+  button.danger { color: var(--missing); }
+
+  .layout { display: grid; grid-template-columns: 380px 1fr; height: calc(100vh - 49px); }
+  .sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--panel); }
+  .main { overflow: auto; padding: 16px 20px; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; padding: 10px; text-align: center; cursor: pointer;
+    color: var(--muted); border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .toolbar { padding: 10px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--border); }
+  .toolbar input[type="search"] {
+    width: 100%; padding: 7px 10px; background: var(--bg);
+    border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+  }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .filters input { margin: 0; }
+
+  .list { flex: 1; overflow: auto; padding: 4px 0; }
+  .group {
+    border-top: 1px solid var(--border);
+  }
+  .group:first-child { border-top: none; }
+  .group-head {
+    padding: 8px 12px; font-size: 12px; font-weight: 600;
+    background: var(--panel2); color: var(--accent2);
+    position: sticky; top: 0; z-index: 1;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer;
+  }
+  .group-head .count { color: var(--muted); font-weight: normal; font-size: 11px; }
+  .group-body { display: block; }
+  .group.collapsed .group-body { display: none; }
+  .item {
+    padding: 6px 12px 6px 24px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    border-left: 3px solid transparent;
+  }
+  .item:hover { background: rgba(255,255,255,0.03); }
+  .item.selected { background: rgba(78,161,255,0.12); border-left-color: var(--accent); }
+  .item.owned { color: var(--text); }
+  .item.owned .name { color: var(--owned); }
+  .item .qty {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+    background: var(--panel2); padding: 1px 6px; border-radius: 10px;
+  }
+  .item.owned .qty { background: rgba(46,204,113,0.15); color: var(--owned); }
+  .item .check { font-family: monospace; color: var(--muted); }
+  .item.owned .check { color: var(--owned); }
+
+  .detail h2 { margin: 0 0 4px; font-size: 18px; }
+  .detail .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 14px; color: var(--accent2); font-weight: 600; }
+  .card .row { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; }
+  .card .row .k { color: var(--muted); width: 80px; flex-shrink: 0; font-size: 12px; }
+  .card .row .v { color: var(--text); }
+  .desc { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
+
+  .variants {
+    display: grid; gap: 6px;
+  }
+  .variant {
+    border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+    display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 10px; align-items: center;
+  }
+  .variant.owned { border-color: var(--owned); background: rgba(46,204,113,0.05); }
+  .variant .vbey { font-weight: 600; }
+  .variant .vparts { color: var(--muted); font-size: 12px; }
+  .variant .vqty { width: 50px; text-align: center;
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 4px; border-radius: 4px;
+  }
+  .variant .badge {
+    background: var(--panel2); color: var(--muted); padding: 2px 6px; border-radius: 4px;
+    font-size: 11px;
+  }
+  .variant.owned .badge { background: var(--owned); color: #002b14; }
+
+  .pill {
+    display: inline-block; padding: 1px 7px; margin-right: 4px;
+    border-radius: 10px; font-size: 11px;
+    background: var(--panel2); color: var(--muted);
+  }
+  .pill.att { background: #6b1f2a; color: #ffb8c1; }
+  .pill.def { background: #1c4564; color: #b8d8ff; }
+  .pill.sta { background: #1a4f30; color: #b8ffd1; }
+  .pill.bal { background: #5a4711; color: #ffe5a1; }
+  .pill.owned { background: var(--owned); color: #002b14; }
+  .pill.missing { background: var(--missing); color: #1a0000; }
+
+  .empty { color: var(--muted); padding: 30px; text-align: center; }
+
+  .source-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .source-list .src {
+    padding: 2px 8px; border-radius: 4px; background: var(--panel2);
+    font-size: 11px; cursor: pointer; border: 1px solid var(--border);
+  }
+  .source-list .src.owned { background: rgba(46,204,113,0.18); border-color: var(--owned); color: var(--owned); }
+  .source-list .src:hover { background: #2a3040; }
+
+  .progress {
+    height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden;
+    margin-top: 4px;
+  }
+  .progress > div { height: 100%; background: var(--accent); }
+
+  textarea.io {
+    width: 100%; min-height: 240px; background: var(--bg);
+    color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 12px;
+  }
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; width: 600px; max-width: 92vw; max-height: 85vh;
+    display: flex; flex-direction: column;
+  }
+  .modal h2 { margin: 0 0 8px; font-size: 16px; }
+  .modal .actions { margin-top: 10px; display: flex; gap: 6px; justify-content: flex-end; }
+
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌀 Beyblade X 收藏管理</h1>
+  <div class="stats" id="stats">載入中…</div>
+  <div class="actions">
+    <button onclick="openImport()">📥 匯入</button>
+    <button onclick="openExport()">📤 匯出</button>
+    <button class="danger" onclick="clearAll()">清空</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="tabs">
+      <div class="tab active" data-tab="products" onclick="switchTab('products')">商品</div>
+      <div class="tab" data-tab="parts" onclick="switchTab('parts')">零件</div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="搜尋商品代號 / 陀螺 / 零件 / 中文名…" oninput="render()">
+      <div class="filters" id="filters"></div>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <main class="main">
+    <div id="detail" class="detail"><div class="empty">← 從左側清單選一個項目開始</div></div>
+  </main>
+</div>
+
+<div class="modal-bg" id="modal-bg" onclick="if(event.target.id==='modal-bg')closeModal()">
+  <div class="modal">
+    <h2 id="modal-title">標題</h2>
+    <div id="modal-body" style="flex:1; overflow:auto;"></div>
+    <div class="actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+/*__DATA__*/
+
+// ============================================================
+// 資料整理
+// ============================================================
+const STORAGE_KEY = "beyx_collection_v1";
+
+// 把 prod-beys 整理成更易用的結構
+// 每筆變體有唯一 id: "<productId>#<index>"
+const VARIANTS = [];
+const PRODUCTS = {}; // productId -> { id, type, variants: [variant], hasCoat }
+
+DB.beys.forEach((row, idx) => {
+  // row: [productId, type, "blade ratchet bit", youtube?, options?]
+  const [productId, type, parts, ...rest] = row;
+  let youtube = null, opts = {};
+  rest.forEach(r => {
+    if (typeof r === "string") youtube = r;
+    else if (r && typeof r === "object") opts = r;
+  });
+  const tokens = parts.split(/\s+/);
+  let blade, ratchet, bit;
+  if (tokens.length === 3) {
+    [blade, ratchet, bit] = tokens;
+  } else {
+    // CX format eg "Bh.Bl.B.K 1-50 I" or 3 tokens always — but "Dr.Ar.S 2-70 K" splits into 3
+    blade = tokens.slice(0, tokens.length - 2).join(" ");
+    ratchet = tokens[tokens.length - 2];
+    bit = tokens[tokens.length - 1];
+  }
+  const v = {
+    id: productId + "#" + idx,
+    productId, type, blade, ratchet, bit,
+    youtube, opts, raw: parts,
+  };
+  VARIANTS.push(v);
+  if (!PRODUCTS[productId]) PRODUCTS[productId] = { id: productId, type, variants: [] };
+  PRODUCTS[productId].variants.push(v);
+});
+
+const PRODUCT_LIST = Object.values(PRODUCTS).sort((a, b) => productSort(a.id).localeCompare(productSort(b.id)));
+
+function productSort(id) {
+  // BX-35 -> "BX-035", BXG-21 -> "BXG-021", CX-7 -> "CX-007"
+  return id.replace(/(\d+)/g, n => n.padStart(4, "0"));
+}
+
+function productSeries(id) {
+  const m = id.match(/^([A-Z]+)/);
+  return m ? m[1] : "其他";
+}
+
+// 零件查找
+function bladeInfo(code) {
+  // "Dr.Ar.S" 是 CX 格式 (4 segments separated by .) or 一體
+  if (code.includes(".") || code.includes("/")) {
+    // CX: chip.main.assist.bit?  or with /
+    return { code, names: { chi: code }, desc: "(CX 組合刃)", isCx: true };
+  }
+  return DB.blade[code] || DB.bladeCollab[code] || DB.bladeDivided[code] || { code, names: { chi: "(未知)" } };
+}
+function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
+function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
+
+function bladeName(code) {
+  const b = bladeInfo(code);
+  if (b.isCx) return code;
+  const c = (b.names && b.names.chi) || "";
+  return c ? c.split(/\s+/)[0] : code;
+}
+function bitName(code) {
+  const b = bitInfo(code);
+  const c = (b.names && b.names.chi) || "";
+  return c || code;
+}
+
+// 由所有資料統計可獲得的零件
+const ALL_BLADES = new Set();
+const ALL_RATCHETS = new Set();
+const ALL_BITS = new Set();
+VARIANTS.forEach(v => {
+  ALL_BLADES.add(v.blade);
+  ALL_RATCHETS.add(v.ratchet);
+  ALL_BITS.add(v.bit);
+});
+
+// 從零件 → 變體列表
+const PART_SOURCES = { blade: {}, ratchet: {}, bit: {} };
+VARIANTS.forEach(v => {
+  (PART_SOURCES.blade[v.blade] = PART_SOURCES.blade[v.blade] || []).push(v);
+  (PART_SOURCES.ratchet[v.ratchet] = PART_SOURCES.ratchet[v.ratchet] || []).push(v);
+  (PART_SOURCES.bit[v.bit] = PART_SOURCES.bit[v.bit] || []).push(v);
+});
+
+// ============================================================
+// 收藏狀態
+// ============================================================
+let state = loadState();
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (s && s.owned) return s;
+  } catch (e) {}
+  return { owned: {} };  // owned[variantId] = qty
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function setOwned(vid, qty) {
+  qty = Math.max(0, parseInt(qty) || 0);
+  if (qty <= 0) delete state.owned[vid];
+  else state.owned[vid] = qty;
+  saveState();
+  render();
+}
+function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
+function ownedQty(vid) { return state.owned[vid] || 0; }
+
+function ownedParts() {
+  const blades = new Set(), ratchets = new Set(), bits = new Set();
+  Object.keys(state.owned).forEach(vid => {
+    const v = VARIANTS.find(x => x.id === vid);
+    if (!v) return;
+    blades.add(v.blade); ratchets.add(v.ratchet); bits.add(v.bit);
+  });
+  return { blades, ratchets, bits };
+}
+
+// ============================================================
+// 渲染
+// ============================================================
+let activeTab = "products";
+let selected = null; // { type: "product"|"blade"|"ratchet"|"bit", id }
+let filterOpts = {
+  ownedOnly: false,
+  missingOnly: false,
+  series: {},
+};
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
+  selected = null;
+  render();
+}
+
+function buildFilters() {
+  const wrap = document.getElementById("filters");
+  if (activeTab === "products") {
+    const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
+    wrap.innerHTML = `
+      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; render()"> 只看擁有</label>
+      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; render()"> 只看缺少</label>
+      <span style="border-left:1px solid var(--border); margin: 0 4px;"></span>
+      ${series.map(s => `<label><input type="checkbox" ${filterOpts.series[s] !== false ? "checked" : ""} onchange="filterOpts.series['${s}']=this.checked; render()"> ${s}</label>`).join("")}
+    `;
+  } else {
+    wrap.innerHTML = `
+      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; render()"> 只看擁有</label>
+      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; render()"> 只看缺少</label>
+    `;
+  }
+}
+
+function render() {
+  buildFilters();
+  renderStats();
+  renderList();
+  renderDetail();
+}
+
+function renderStats() {
+  const ownedCount = Object.keys(state.owned).length;
+  const totalVar = VARIANTS.length;
+  const op = ownedParts();
+  document.getElementById("stats").innerHTML =
+    `已擁有 <b>${ownedCount}</b>/${totalVar} 變體 ・ ` +
+    `Blade <b>${op.blades.size}</b>/${ALL_BLADES.size} ・ ` +
+    `Ratchet <b>${op.ratchets.size}</b>/${ALL_RATCHETS.size} ・ ` +
+    `Bit <b>${op.bits.size}</b>/${ALL_BITS.size}`;
+}
+
+function renderList() {
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const listEl = document.getElementById("list");
+  if (activeTab === "products") {
+    listEl.innerHTML = renderProductList(q);
+  } else {
+    listEl.innerHTML = renderPartList(q);
+  }
+}
+
+function renderProductList(q) {
+  const series = {};
+  PRODUCT_LIST.forEach(p => {
+    const s = productSeries(p.id);
+    if (filterOpts.series[s] === false) return;
+    if (!series[s]) series[s] = [];
+    series[s].push(p);
+  });
+  const html = [];
+  Object.keys(series).sort().forEach(s => {
+    const items = series[s].filter(p => productMatches(p, q));
+    if (!items.length) return;
+    let visible = 0;
+    const rows = items.map(p => {
+      const ownedV = p.variants.filter(v => isOwned(v.id)).length;
+      const total = p.variants.length;
+      if (filterOpts.ownedOnly && ownedV === 0) return "";
+      if (filterOpts.missingOnly && ownedV === total) return "";
+      visible++;
+      const cls = (ownedV === total ? "owned" : "") + (selected && selected.type==="product" && selected.id===p.id ? " selected" : "");
+      return `<div class="item ${cls}" onclick="select('product','${p.id}')">
+        <span class="check">${ownedV === total ? "●" : ownedV > 0 ? "◐" : "○"}</span>
+        <span class="name">${p.id}</span>
+        <span style="color:var(--muted); font-size:11px;">${p.type}</span>
+        <span class="qty">${ownedV}/${total}</span>
+      </div>`;
+    }).join("");
+    if (visible) {
+      html.push(`<div class="group">
+        <div class="group-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span>${s} 系列</span>
+          <span class="count">${visible} / ${items.length}</span>
+        </div>
+        <div class="group-body">${rows}</div>
+      </div>`);
+    }
+  });
+  return html.join("") || `<div class="empty">沒有符合條件的商品</div>`;
+}
+
+function productMatches(p, q) {
+  if (!q) return true;
+  if (p.id.toLowerCase().includes(q)) return true;
+  return p.variants.some(v => variantMatches(v, q));
+}
+
+function variantMatches(v, q) {
+  return v.raw.toLowerCase().includes(q)
+    || bladeName(v.blade).toLowerCase().includes(q)
+    || bitName(v.bit).toLowerCase().includes(q);
+}
+
+function renderPartList(q) {
+  const op = ownedParts();
+  const sections = [
+    { key: "blade", title: "Blade 戰刃", items: [...ALL_BLADES].sort(), info: bladeInfo, owned: op.blades },
+    { key: "ratchet", title: "Ratchet 核輪", items: [...ALL_RATCHETS].sort(), info: ratchetInfo, owned: op.ratchets },
+    { key: "bit", title: "Bit 軸端", items: [...ALL_BITS].sort(), info: bitInfo, owned: op.bits },
+  ];
+  return sections.map(sec => {
+    const filtered = sec.items.filter(code => {
+      const isO = sec.owned.has(code);
+      if (filterOpts.ownedOnly && !isO) return false;
+      if (filterOpts.missingOnly && isO) return false;
+      if (q) {
+        const info = sec.info(code);
+        const nameStr = (info.names ? info.names.chi || info.names.eng || "" : "") + " " + code;
+        if (!nameStr.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+    if (!filtered.length) return "";
+    return `<div class="group">
+      <div class="group-head" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span>${sec.title}</span>
+        <span class="count">${[...sec.owned].filter(c => sec.items.includes(c)).length} / ${sec.items.length}</span>
+      </div>
+      <div class="group-body">
+        ${filtered.map(code => {
+          const info = sec.info(code);
+          const isO = sec.owned.has(code);
+          const cls = (isO ? "owned" : "") + (selected && selected.type === sec.key && selected.id === code ? " selected" : "");
+          const display = sec.key === "ratchet" ? code :
+                          sec.key === "blade" ? `${code} ${info.isCx ? "" : "<span style='color:var(--muted)'>" + (bladeName(code)) + "</span>"}` :
+                          `${code} <span style='color:var(--muted)'>${bitName(code)}</span>`;
+          return `<div class="item ${cls}" onclick="select('${sec.key}','${escapeAttr(code)}')">
+            <span class="check">${isO ? "●" : "○"}</span>
+            <span class="name">${display}</span>
+            <span class="qty">${PART_SOURCES[sec.key][code].length}</span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  }).join("") || `<div class="empty">沒有符合條件的零件</div>`;
+}
+
+function escapeAttr(s) { return s.replace(/'/g, "\\'"); }
+
+function select(type, id) {
+  selected = { type, id };
+  render();
+}
+
+function renderDetail() {
+  const el = document.getElementById("detail");
+  if (!selected) { el.innerHTML = `<div class="empty">← 從左側清單選一個項目開始</div>`; return; }
+  if (selected.type === "product") el.innerHTML = renderProductDetail(PRODUCTS[selected.id]);
+  else el.innerHTML = renderPartDetail(selected.type, selected.id);
+}
+
+function renderProductDetail(p) {
+  if (!p) return `<div class="empty">找不到商品</div>`;
+  const ownedV = p.variants.filter(v => isOwned(v.id)).length;
+  const variants = p.variants.map((v, i) => {
+    const blade = bladeInfo(v.blade);
+    const bit = bitInfo(v.bit);
+    const bChi = blade.isCx ? "" : bladeName(v.blade);
+    const bitChi = bitName(v.bit);
+    const get = v.opts.get;
+    const coat = v.opts.coat;
+    const qty = ownedQty(v.id);
+    const owned = qty > 0;
+    return `<div class="variant ${owned ? "owned" : ""}">
+      <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
+      <div>
+        <div class="vbey">${v.blade} ${v.ratchet} ${v.bit}</div>
+        <div class="vparts">${bChi} · ${v.ratchet} · ${bitChi}${get ? ` · 抽 ${get}` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
+      </div>
+      <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
+      <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
+      <button onclick="setOwned('${v.id}', ${qty + 1})">＋</button>
+    </div>`;
+  }).join("");
+  return `<div>
+    <h2>${p.id} <span style="color:var(--muted); font-size: 13px;">${p.type}</span></h2>
+    <div class="sub">擁有 ${ownedV}/${p.variants.length} 變體</div>
+    <div class="variants">${variants}</div>
+  </div>`;
+}
+
+function renderPartDetail(type, code) {
+  const info = type === "blade" ? bladeInfo(code) : type === "ratchet" ? ratchetInfo(code) : bitInfo(code);
+  const sources = PART_SOURCES[type][code] || [];
+  const owned = sources.some(v => isOwned(v.id));
+  const names = info.names || {};
+  const attr = info.attr || [];
+  const stat = info.stat || [];
+  return `<div>
+    <h2>
+      ${code}
+      <span style="color:var(--muted); font-size: 14px;">${names.chi || ""}</span>
+      <span class="pill ${owned ? "owned" : "missing"}">${owned ? "已擁有" : "缺少"}</span>
+    </h2>
+    <div class="sub">${type === "blade" ? "Blade 戰刃" : type === "ratchet" ? "Ratchet 核輪" : "Bit 軸端"}</div>
+
+    <div class="card">
+      <h3>零件資訊</h3>
+      ${names.jap ? `<div class="row"><span class="k">日文</span><span class="v">${names.jap}</span></div>` : ""}
+      ${names.eng ? `<div class="row"><span class="k">英文</span><span class="v">${names.eng}</span></div>` : ""}
+      ${names.chi ? `<div class="row"><span class="k">中文</span><span class="v">${names.chi}</span></div>` : ""}
+      ${attr.length ? `<div class="row"><span class="k">屬性</span><span class="v">${attr.map(a => `<span class="pill ${a}">${a}</span>`).join("")}</span></div>` : ""}
+      ${stat.length ? `<div class="row"><span class="k">數據</span><span class="v" style="font-family:monospace">${stat.join(" / ")}</span></div>` : ""}
+      ${info.desc ? `<div class="desc">${info.desc}</div>` : ""}
+    </div>
+
+    <div class="card">
+      <h3>來自哪些商品（${sources.filter(v => isOwned(v.id)).length}/${sources.length} 已擁有）</h3>
+      <div class="source-list">
+        ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="select('product','${v.productId}')">${v.productId} · ${v.raw}</span>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// 匯入匯出
+// ============================================================
+function openExport() {
+  const exportData = {
+    schema: "beyx_collection",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    summary: {
+      variants: Object.keys(state.owned).length,
+      parts: (() => { const op = ownedParts(); return { blade: op.blades.size, ratchet: op.ratchets.size, bit: op.bits.size }; })(),
+    },
+    owned: state.owned,
+  };
+  showModal("匯出收藏 JSON", `
+    <p style="color:var(--muted); margin-top:0;">複製下方內容，或按下載另存新檔。</p>
+    <textarea class="io" id="io-text" readonly>${JSON.stringify(exportData, null, 2)}</textarea>
+  `, [
+    { label: "📋 複製", action: () => {
+      navigator.clipboard.writeText(document.getElementById("io-text").value);
+      alert("已複製到剪貼簿");
+    }},
+    { label: "💾 下載", primary: true, action: () => {
+      const blob = new Blob([document.getElementById("io-text").value], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+    }},
+    { label: "關閉", action: closeModal },
+  ]);
+}
+
+function openImport() {
+  showModal("匯入收藏 JSON", `
+    <p style="color:var(--muted); margin-top:0;">貼上之前匯出的 JSON 內容。也可以選擇檔案。</p>
+    <input type="file" accept=".json,application/json" onchange="loadFile(this.files[0])" style="margin-bottom:8px;">
+    <textarea class="io" id="io-text" placeholder='{"owned": {"BX-35#3": 1, ...}}'></textarea>
+    <div style="color: var(--warn); font-size: 12px; margin-top: 6px;" id="io-warn"></div>
+  `, [
+    { label: "🔁 取代", primary: true, action: () => doImport(true) },
+    { label: "➕ 合併", action: () => doImport(false) },
+    { label: "取消", action: closeModal },
+  ]);
+}
+
+function loadFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { document.getElementById("io-text").value = r.result; };
+  r.readAsText(f);
+}
+
+function doImport(replace) {
+  const txt = document.getElementById("io-text").value.trim();
+  if (!txt) return;
+  let data;
+  try { data = JSON.parse(txt); }
+  catch (e) {
+    document.getElementById("io-warn").textContent = "JSON 解析失敗：" + e.message;
+    return;
+  }
+  const owned = data.owned || data;
+  if (typeof owned !== "object") {
+    document.getElementById("io-warn").textContent = "找不到 owned 欄位";
+    return;
+  }
+  const validIds = new Set(VARIANTS.map(v => v.id));
+  const next = replace ? {} : { ...state.owned };
+  let added = 0, skipped = 0;
+  Object.entries(owned).forEach(([k, v]) => {
+    const qty = parseInt(v) || 0;
+    if (qty <= 0) return;
+    if (!validIds.has(k)) { skipped++; return; }
+    next[k] = qty;
+    added++;
+  });
+  state.owned = next;
+  saveState();
+  closeModal();
+  render();
+  alert(`匯入完成：套用 ${added} 筆${skipped ? `，略過 ${skipped} 筆無效 id` : ""}`);
+}
+
+function clearAll() {
+  if (!confirm("確定要清空所有擁有紀錄？")) return;
+  state.owned = {};
+  saveState();
+  render();
+}
+
+// ============================================================
+// Modal
+// ============================================================
+function showModal(title, bodyHtml, actions) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").innerHTML = bodyHtml;
+  const ac = document.getElementById("modal-actions");
+  ac.innerHTML = "";
+  actions.forEach(a => {
+    const b = document.createElement("button");
+    b.textContent = a.label;
+    if (a.primary) b.className = "primary";
+    b.onclick = a.action;
+    ac.appendChild(b);
+  });
+  document.getElementById("modal-bg").classList.add("open");
+}
+function closeModal() { document.getElementById("modal-bg").classList.remove("open"); }
+
+// ============================================================
+// 啟動
+// ============================================================
+render();
+</script>
+</body>
+</html>
