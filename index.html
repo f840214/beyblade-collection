@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.27</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.28</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -790,10 +790,28 @@ function renderBuildEditor(id) {
 let pickerCtx = null;
 function openPartPicker(buildId, slot) {
   pickerCtx = { buildId, slot, query: "", onlyOwned: false };
-  renderPartPicker();
+  const slotName = slot === "blade" ? "戰刃" : slot === "ratchet" ? "固鎖" : "軸";
+  // 只在開啟時 build 一次 modal 殼，後續搜尋只更新內部 list (避免 input 失焦)
+  showModal(`選擇 ${slotName}`, `
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+      <input type="search" id="picker-q" placeholder="搜尋代號 / 中文名 / 商品代號 (例: UX01)"
+             oninput="pickerCtx.query = this.value; renderPartPickerList();"
+             style="flex:1; min-width:160px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+      <label style="display:flex; align-items:center; gap:4px; color:var(--muted); font-size:12px; white-space:nowrap;">
+        <input type="checkbox" id="picker-owned" onchange="pickerCtx.onlyOwned = this.checked; renderPartPickerList();"> 只看擁有
+      </label>
+    </div>
+    <div id="picker-list" style="max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:6px;"></div>
+  `, [
+    { label: "取消", action: () => { pickerCtx = null; closeModal(); } }
+  ]);
+  renderPartPickerList();
+  setTimeout(() => { const e = document.getElementById("picker-q"); if (e) e.focus(); }, 30);
 }
-function renderPartPicker() {
+
+function renderPartPickerList() {
   const ctx = pickerCtx; if (!ctx) return;
+  const listEl = document.getElementById("picker-list"); if (!listEl) return;
   const op = ownedParts();
   const all = ctx.slot === "blade" ? [...ALL_BLADES] : ctx.slot === "ratchet" ? [...ALL_RATCHETS] : [...ALL_BITS];
   const ownedSet = ctx.slot === "blade" ? op.blades : ctx.slot === "ratchet" ? op.ratchets : op.bits;
@@ -805,35 +823,25 @@ function renderPartPicker() {
     const inf = info(c);
     const chi = inf.names ? inf.names.chi || "" : "";
     const eng = inf.names ? inf.names.eng || "" : "";
-    return codeMatches(c, ctx.query) || codeMatches(eng, ctx.query) || chiMatches(chi, ctx.query);
+    if (codeMatches(c, ctx.query) || codeMatches(eng, ctx.query) || chiMatches(chi, ctx.query)) return true;
+    // 也以商品代號搜尋: UX-01 / UX01 → 找出 UX-01 包含的所有零件
+    const sources = PART_SOURCES[ctx.slot][c] || [];
+    return sources.some(v => codeMatches(v.productId, ctx.query));
   }).sort();
-  const slotName = ctx.slot === "blade" ? "戰刃" : ctx.slot === "ratchet" ? "固鎖" : "軸";
-  showModal(`選擇 ${slotName}`, `
-    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-      <input type="search" id="picker-q" placeholder="搜尋代號或中文名..." value="${ctx.query.replace(/"/g,'&quot;')}"
-             oninput="pickerCtx.query = this.value; renderPartPicker();"
-             style="flex:1; min-width:160px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
-      <label style="display:flex; align-items:center; gap:4px; color:var(--muted); font-size:12px; white-space:nowrap;">
-        <input type="checkbox" ${ctx.onlyOwned ? 'checked' : ''} onchange="pickerCtx.onlyOwned = this.checked; renderPartPicker();"> 只看擁有
-      </label>
-    </div>
-    <div style="max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:6px;">
-      ${filtered.length === 0 ? `<div class="empty" style="padding:20px;">沒有符合條件</div>`
-        : filtered.map(c => {
-          const inf = info(c);
-          const cn = nameFn(c, inf);
-          const ow = ownedSet.has(c);
-          return `<div class="item ${ow ? 'owned' : ''}" style="padding:8px 12px; cursor:pointer;" onclick="pickPart('${escapeAttr(c)}')">
-            <span class="check">${ow ? '●' : '○'}</span>
-            <span class="name">${cn || c}</span>
-            ${cn ? `<span style="margin-left:auto; color:var(--muted); font-family:monospace; font-size:11px;">${c}</span>` : ''}
-          </div>`;
-        }).join("")}
-    </div>
-  `, [
-    { label: "取消", action: () => { pickerCtx = null; closeModal(); } }
-  ]);
-  setTimeout(() => { const e = document.getElementById("picker-q"); if (e) e.focus(); }, 30);
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div class="empty" style="padding:20px;">沒有符合條件</div>`;
+    return;
+  }
+  listEl.innerHTML = filtered.map(c => {
+    const inf = info(c);
+    const cn = nameFn(c, inf);
+    const ow = ownedSet.has(c);
+    return `<div class="item ${ow ? 'owned' : ''}" style="padding:8px 12px; cursor:pointer;" onclick="pickPart('${escapeAttr(c)}')">
+      <span class="check">${ow ? '●' : '○'}</span>
+      <span class="name">${cn || c}</span>
+      ${cn ? `<span style="margin-left:auto; color:var(--muted); font-family:monospace; font-size:11px;">${c}</span>` : ''}
+    </div>`;
+  }).join("");
 }
 function pickPart(code) {
   const ctx = pickerCtx; if (!ctx) return;
