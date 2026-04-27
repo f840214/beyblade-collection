@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.28</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.29</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -302,13 +302,31 @@ function productSeries(id) {
 }
 
 // 零件查找
-function bladeInfo(code) {
-  // "Dr.Ar.S" 是 CX 格式 (4 segments separated by .) or 一體
-  if (code.includes(".") || code.includes("/")) {
-    // CX: chip.main.assist.bit?  or with /
-    return { code, names: { chi: code }, desc: "(CX 組合刃)", isCx: true };
+// CX 戰刃片段: 在 chip / main / over / metal / assist / hasbro 各分類底下查詢
+function findCxSegment(seg) {
+  if (!seg || seg === "/") return null;
+  const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
+  for (const cat of ["chip", "main", "over", "metal", "assist", "hasbro"]) {
+    if (cx[cat] && cx[cat][seg]) return { ...cx[cat][seg], _category: cat, _code: seg };
   }
-  return DB.blade[code] || DB.bladeCollab[code] || DB.bladeDivided[code] || { code, names: { chi: "(未知)" } };
+  return null;
+}
+function cxComposeChi(code) {
+  const segs = code.split(".").map(s => s.trim());
+  const out = segs.map(s => {
+    if (!s || s === "/") return null;
+    const f = findCxSegment(s);
+    if (!f) return s;
+    return preferredChi(f.names && f.names.chi) || s;
+  }).filter(Boolean);
+  return out.length ? out.join("・") : code;
+}
+function bladeInfo(code) {
+  if (code.includes(".") || code.includes("/")) {
+    const chi = cxComposeChi(code);
+    return { code, names: { chi: chi }, desc: "(CX 組合刃)", isCx: true };
+  }
+  return DB.blade[code] || (DB.bladeCollab && DB.bladeCollab[code]) || { code, names: { chi: "(未知)" } };
 }
 function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
@@ -344,7 +362,7 @@ function preferredChi(c) {
 }
 function bladeName(code) {
   const b = bladeInfo(code);
-  if (b.isCx) return code;
+  if (b.isCx) return (b.names && b.names.chi) || code;
   return preferredChi(b.names && b.names.chi) || code;
 }
 function bitName(code) {
