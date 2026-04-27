@@ -18,13 +18,12 @@ const db = {
   bit:           load("part-bit.json"),
 };
 
-// 版本號: v0.{commit數+1}.{短SHA}; 還沒 commit 過就用 dev
+// 版本號: v0.{commit數+1}; 還沒 commit 過就用 dev
 let version = "dev";
 try {
-  // commit 數會包含尚未 commit 的這次，所以 +1 (跑 build 時通常還沒 commit)
+  // +1 因為跑 build 時通常還沒 commit；commit 後 push 的版本就會剛好對上
   const count = cp.execSync("git rev-list --count HEAD", { cwd: ROOT }).toString().trim();
-  const sha   = cp.execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim();
-  version = `v0.${parseInt(count, 10) + 1}.${sha}`;
+  version = `v0.${parseInt(count, 10) + 1}`;
 } catch (e) {}
 const buildDate = new Date().toISOString().slice(0, 10);
 
