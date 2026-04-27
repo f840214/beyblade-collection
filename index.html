@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.25</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.26</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -474,7 +474,7 @@ function renderStats() {
   const totalVar = VARIANTS.length;
   const op = ownedParts();
   document.getElementById("stats").innerHTML =
-    `已擁有 <b>${ownedCount}</b>/${totalVar} 變體 ・ ` +
+    `已擁有 <b>${ownedCount}</b>/${totalVar} 陀螺 ・ ` +
     `戰刃 <b>${op.blades.size}</b>/${ALL_BLADES.size} ・ ` +
     `固鎖 <b>${op.ratchets.size}</b>/${ALL_RATCHETS.size} ・ ` +
     `軸 <b>${op.bits.size}</b>/${ALL_BITS.size}`;
@@ -840,7 +840,7 @@ function renderProductDetail(p) {
   }).join("");
   return `<div>
     <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span></h2>
-    <div class="sub">擁有 ${ownedV}/${p.variants.length} 變體</div>
+    <div class="sub">擁有 ${ownedV}/${p.variants.length} 陀螺</div>
     <div class="variants">${variants}</div>
   </div>`;
 }
