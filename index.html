@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.29</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.30</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -302,24 +302,36 @@ function productSeries(id) {
 }
 
 // 零件查找
-// CX 戰刃片段: 在 chip / main / over / metal / assist / hasbro 各分類底下查詢
-function findCxSegment(seg) {
+// CX 戰刃片段在 chip / main / over / metal / assist / hasbro 等分類下查詢
+// 位置 → 分類偏好 (4-part: chip.metal-or-main.over.assist; 3-part: chip.main.assist)
+const CX_POSITIONS = {
+  3: ["chip", "main", "assist"],
+  4: ["chip", ["metal", "main"], "over", "assist"],
+};
+function findCxSegmentAt(seg, pos, total) {
   if (!seg || seg === "/") return null;
   const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
-  for (const cat of ["chip", "main", "over", "metal", "assist", "hasbro"]) {
+  const positional = CX_POSITIONS[total];
+  const fallback = ["chip", "metal", "main", "over", "assist", "hasbro"];
+  const cats = positional && positional[pos]
+    ? (Array.isArray(positional[pos]) ? positional[pos] : [positional[pos]])
+    : fallback;
+  for (const cat of cats) {
     if (cx[cat] && cx[cat][seg]) return { ...cx[cat][seg], _category: cat, _code: seg };
   }
   return null;
 }
+// 組合中文: 把有翻譯的段直接接起來 (e.g. Bh.Bl.B.K → 龍王閃擊)
+// 沒有任何段有中文就回退到原始代號
 function cxComposeChi(code) {
   const segs = code.split(".").map(s => s.trim());
-  const out = segs.map(s => {
+  const named = segs.map((s, i) => {
     if (!s || s === "/") return null;
-    const f = findCxSegment(s);
-    if (!f) return s;
-    return preferredChi(f.names && f.names.chi) || s;
+    const f = findCxSegmentAt(s, i, segs.length);
+    if (!f) return null;
+    return preferredChi(f.names && f.names.chi) || null;
   }).filter(Boolean);
-  return out.length ? out.join("・") : code;
+  return named.length ? named.join("") : code;
 }
 function bladeInfo(code) {
   if (code.includes(".") || code.includes("/")) {
