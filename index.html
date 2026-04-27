@@ -536,7 +536,7 @@ function renderProductDetail(p) {
       <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       <div>
         <div class="vbey">${v.blade} ${v.ratchet} ${v.bit}</div>
-        <div class="vparts">${bChi} · ${v.ratchet} · ${bitChi}${get ? ` · 抽 ${get}` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
+        <div class="vparts">${bChi} · ${v.ratchet} · ${bitChi}${get ? ` · 每箱 ${get} 盒` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
       </div>
       <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
       <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
