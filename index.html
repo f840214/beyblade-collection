@@ -181,7 +181,7 @@
 </head>
 <body>
 <header>
-  <h1>🌀 Beyblade X 收藏管理</h1>
+  <h1>Beyblade X 收藏管理</h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -456,7 +456,7 @@ function renderMineSidebar() {
   const op = ownedParts();
   const ownedProdCount = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id))).length;
   const sections = [
-    { key: "products", label: "🎁 商品", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
+    { key: "products", label: "🌀 陀螺戰士", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
     { key: "blade",    label: "⚔️ 戰刃", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
     { key: "ratchet",  label: "⚙️ 固鎖", n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
     { key: "bit",      label: "🔩 軸",   n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
@@ -676,7 +676,7 @@ function renderCollection() {
     (c, inf) => inf.names && inf.names.chi || "");
 
   return `<div>
-    <h2 id="mine-products" style="margin-top:0;">🎁 我的商品 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
+    <h2 id="mine-products" style="margin-top:0;">🌀 陀螺戰士 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">${productsHtml}</div>
     ${bladeSec}
     ${ratchetSec}
