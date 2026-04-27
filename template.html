@@ -396,8 +396,8 @@ function renderStats() {
   document.getElementById("stats").innerHTML =
     `已擁有 <b>${ownedCount}</b>/${totalVar} 變體 ・ ` +
     `Blade <b>${op.blades.size}</b>/${ALL_BLADES.size} ・ ` +
-    `Ratchet <b>${op.ratchets.size}</b>/${ALL_RATCHETS.size} ・ ` +
-    `Bit <b>${op.bits.size}</b>/${ALL_BITS.size}`;
+    `固鎖 <b>${op.ratchets.size}</b>/${ALL_RATCHETS.size} ・ ` +
+    `軸 <b>${op.bits.size}</b>/${ALL_BITS.size}`;
 }
 
 function renderList() {
@@ -466,8 +466,8 @@ function renderPartList(q) {
   const op = ownedParts();
   const sections = [
     { key: "blade", title: "Blade 戰刃", items: [...ALL_BLADES].sort(), info: bladeInfo, owned: op.blades },
-    { key: "ratchet", title: "Ratchet 核輪", items: [...ALL_RATCHETS].sort(), info: ratchetInfo, owned: op.ratchets },
-    { key: "bit", title: "Bit 軸端", items: [...ALL_BITS].sort(), info: bitInfo, owned: op.bits },
+    { key: "ratchet", title: "固鎖", items: [...ALL_RATCHETS].sort(), info: ratchetInfo, owned: op.ratchets },
+    { key: "bit", title: "軸", items: [...ALL_BITS].sort(), info: bitInfo, owned: op.bits },
   ];
   return sections.map(sec => {
     const filtered = sec.items.filter(code => {
@@ -563,7 +563,7 @@ function renderPartDetail(type, code) {
       <span style="color:var(--muted); font-size: 14px;">${names.chi || ""}</span>
       <span class="pill ${owned ? "owned" : "missing"}">${owned ? "已擁有" : "缺少"}</span>
     </h2>
-    <div class="sub">${type === "blade" ? "Blade 戰刃" : type === "ratchet" ? "Ratchet 核輪" : "Bit 軸端"}</div>
+    <div class="sub">${type === "blade" ? "Blade 戰刃" : type === "ratchet" ? "固鎖" : "軸"}</div>
 
     <div class="card">
       <h3>零件資訊</h3>
