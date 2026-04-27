@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.32</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.33</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -456,6 +456,14 @@ function duplicateBuild(id) {
   state.builds.push(copy); saveState();
   selected = { type: "build", id: copy.id }; render();
 }
+// 把變體顯示成「中文戰刃 固鎖 中文軸」(用於來源 pill 顯示)
+function variantDisplayChi(v) {
+  const b = isEmptyPart(v.blade) ? "—" : (bladeName(v.blade) || v.blade);
+  const r = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
+  const i = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
+  return `${b} ${r} ${i}`;
+}
+
 function buildStatus(b) {
   const op = ownedParts();
   const need = [b.blade, b.ratchet, b.bit].filter(Boolean).length;
@@ -954,7 +962,7 @@ function renderCollection() {
           <div style="margin-top:8px;">
             <div style="color: var(--muted); font-size:11px; margin-bottom:4px;">來自（已擁有 ${ownedSources.length} / ${sources.length}）：</div>
             <div class="source-list">
-              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')" title="${productTypeName(PRODUCTS[v.productId].type)}">${v.productId} · ${v.raw}</span>`).join("")}
+              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')" title="${productTypeName(PRODUCTS[v.productId].type)}">${v.productId} · ${variantDisplayChi(v)}</span>`).join("")}
             </div>
           </div>
         </div>`;
@@ -1103,7 +1111,7 @@ function renderPartDetail(type, code) {
     <div class="card">
       <h3>來自哪些商品（${sources.filter(v => isOwned(v.id)).length}/${sources.length} 已擁有）</h3>
       <div class="source-list">
-        ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="select('product','${v.productId}')">${v.productId} · ${v.raw}</span>`).join("")}
+        ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="select('product','${v.productId}')">${v.productId} · ${variantDisplayChi(v)}</span>`).join("")}
       </div>
     </div>
   </div>`;
