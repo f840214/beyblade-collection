@@ -211,7 +211,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.30</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-27">v0.31</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -638,7 +638,7 @@ function renderProductList(q) {
       visible++;
       const cls = (ownedV === total ? "owned" : "") + (selected && selected.type==="product" && selected.id===p.id ? " selected" : "");
       const blades = [...new Set(p.variants
-        .map(v => isEmptyPart(v.blade) ? null : (bladeInfo(v.blade).isCx ? v.blade : bladeName(v.blade)))
+        .map(v => isEmptyPart(v.blade) ? null : bladeName(v.blade))
         .filter(Boolean))];
       const bladesStr = blades.length === 0 ? ""
         : blades.length > 3 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
@@ -732,7 +732,7 @@ function renderPartList(q) {
           const isO = sec.owned.has(code);
           const cls = (isO ? "owned" : "") + (selected && selected.type === sec.key && selected.id === code ? " selected" : "");
           const cn = sec.key === "ratchet" ? "" :
-                     sec.key === "blade" ? (info.isCx ? "" : bladeName(code)) :
+                     sec.key === "blade" ? bladeName(code) :
                      bitName(code);
           const display = cn
             ? `${cn} <span style='color:var(--muted); font-family:monospace; font-size:11px;'>${code}</span>`
@@ -806,8 +806,7 @@ function renderBuildEditor(id) {
       <button class="danger" onclick="deleteBuild('${id}')">🗑 刪除</button>
     </div>
     <div style="margin-bottom:12px;">${statusPill}</div>
-    ${slot("blade", "⚔️ 戰刃", b.blade, bladeInfo,
-      (c, i) => i && i.isCx ? c : preferredChi(i && i.names && i.names.chi), op.blades)}
+    ${slot("blade", "⚔️ 戰刃", b.blade, bladeInfo, (c) => bladeName(c), op.blades)}
     ${slot("ratchet", "⚙️ 固鎖", b.ratchet, ratchetInfo, () => "", op.ratchets)}
     ${slot("bit", "🔩 軸", b.bit, bitInfo,
       (c, i) => preferredChi(i && i.names && i.names.chi), op.bits)}
@@ -846,7 +845,7 @@ function renderPartPickerList() {
   const all = ctx.slot === "blade" ? [...ALL_BLADES] : ctx.slot === "ratchet" ? [...ALL_RATCHETS] : [...ALL_BITS];
   const ownedSet = ctx.slot === "blade" ? op.blades : ctx.slot === "ratchet" ? op.ratchets : op.bits;
   const info = ctx.slot === "blade" ? bladeInfo : ctx.slot === "ratchet" ? ratchetInfo : bitInfo;
-  const nameFn = ctx.slot === "ratchet" ? () => "" : (c) => { const i = info(c); return i.isCx ? "" : preferredChi(i.names && i.names.chi); };
+  const nameFn = ctx.slot === "ratchet" ? () => "" : (c) => ctx.slot === "blade" ? bladeName(c) : bitName(c);
   const filtered = all.filter(c => {
     if (ctx.onlyOwned && !ownedSet.has(c)) return false;
     if (!ctx.query) return true;
@@ -909,7 +908,7 @@ function renderCollection() {
             </div>
             <div style="margin-top:6px; font-size:12px;">
               ${ownedVars.map(v => {
-                const bChi = isEmptyPart(v.blade) ? "—" : (bladeInfo(v.blade).isCx ? v.blade : bladeName(v.blade) || v.blade);
+                const bChi = isEmptyPart(v.blade) ? "—" : (bladeName(v.blade) || v.blade);
                 const rDisp = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
                 const bitC = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
                 const codeStr = [isEmptyPart(v.blade)?"—":v.blade, rDisp, isEmptyPart(v.bit)?"—":v.bit].join(" ");
@@ -960,7 +959,7 @@ function renderCollection() {
   };
 
   const bladeSec = partSection("⚔️ 戰刃", "mine-blade", op.blades, bladeInfo,
-    (c, inf) => inf.isCx ? "" : preferredChi(inf.names && inf.names.chi));
+    (c) => bladeName(c));
   const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, () => "");
   const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
     (c, inf) => inf.names && inf.names.chi || "");
@@ -1028,7 +1027,7 @@ function renderCollectionTable(q) {
   };
 
   return tableSec("⚔️ 戰刃", op.blades, bladeInfo,
-    (c, inf) => inf.isCx ? c : preferredChi(inf.names && inf.names.chi), "blade") +
+    (c) => bladeName(c), "blade") +
     tableSec("⚙️ 固鎖", op.ratchets, ratchetInfo, () => "", "ratchet") +
     tableSec("🔩 軸", op.bits, bitInfo,
     (c, inf) => preferredChi(inf.names && inf.names.chi), "bit");
@@ -1044,7 +1043,7 @@ function renderProductDetail(p) {
       isEmptyPart(v.bit) ? "—" : v.bit,
     ].join(" ");
     const blade = isEmptyPart(v.blade) ? null : bladeInfo(v.blade);
-    const bChi = blade ? (blade.isCx ? v.blade : bladeName(v.blade) || v.blade) : "—";
+    const bChi = blade ? (bladeName(v.blade) || v.blade) : "—";
     const ratchetDisplay = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
     const bitChi = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
     const cnDisplay = `${bChi} · ${ratchetDisplay} · ${bitChi}`;
