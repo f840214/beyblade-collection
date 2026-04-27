@@ -226,6 +226,7 @@
       <div class="tab active" data-tab="products" onclick="switchTab('products')">商品</div>
       <div class="tab" data-tab="parts" onclick="switchTab('parts')">零件</div>
       <div class="tab" data-tab="mine" onclick="switchTab('mine')">我的收藏</div>
+      <div class="tab" data-tab="builds" onclick="switchTab('builds')">配置</div>
     </div>
     <div class="toolbar">
       <input type="search" id="search" placeholder="搜尋商品代號 / 陀螺 / 零件 / 中文名…" oninput="render()">
@@ -377,9 +378,12 @@ let state = loadState();
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (s && s.owned) return s;
+    if (s && s.owned) {
+      if (!Array.isArray(s.builds)) s.builds = [];
+      return s;
+    }
   } catch (e) {}
-  return { owned: {} };  // owned[variantId] = qty
+  return { owned: {}, builds: [] };  // owned[variantId] = qty; builds[]={id,name,blade,ratchet,bit,note}
 }
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -393,6 +397,43 @@ function setOwned(vid, qty) {
 }
 function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
 function ownedQty(vid) { return state.owned[vid] || 0; }
+
+// 配置 (builds) 操作
+function newBuildId() { return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function getBuild(id) { return state.builds.find(b => b.id === id); }
+function newBuild() {
+  const b = { id: newBuildId(), name: "新配置 " + (state.builds.length + 1), blade: "", ratchet: "", bit: "", note: "" };
+  state.builds.push(b);
+  saveState();
+  selected = { type: "build", id: b.id };
+  render();
+}
+function updateBuildField(id, field, value) {
+  const b = getBuild(id);
+  if (!b) return;
+  b[field] = value;
+  saveState();
+  renderList(); renderStats();  // 刷側欄與頂統計，但不刷 detail (避免輸入失焦)
+}
+function deleteBuild(id) {
+  if (!confirm("刪除這個配置？")) return;
+  state.builds = state.builds.filter(b => b.id !== id);
+  saveState(); selected = null; render();
+}
+function duplicateBuild(id) {
+  const orig = getBuild(id); if (!orig) return;
+  const copy = { ...orig, id: newBuildId(), name: orig.name + " 複本" };
+  state.builds.push(copy); saveState();
+  selected = { type: "build", id: copy.id }; render();
+}
+function buildStatus(b) {
+  const op = ownedParts();
+  const need = [b.blade, b.ratchet, b.bit].filter(Boolean).length;
+  const have = (b.blade && op.blades.has(b.blade) ? 1 : 0) +
+               (b.ratchet && op.ratchets.has(b.ratchet) ? 1 : 0) +
+               (b.bit && op.bits.has(b.bit) ? 1 : 0);
+  return { need, have, complete: need === 3 && have === 3, missing: need - have };
+}
 
 function ownedParts() {
   const blades = new Set(), ratchets = new Set(), bits = new Set();
@@ -442,6 +483,11 @@ function buildFilters() {
     searchEl.placeholder = "在我的收藏中搜尋…";
     return;
   }
+  if (activeTab === "builds") {
+    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">儲存並追蹤你的陀螺組合</span>`;
+    searchEl.placeholder = "搜尋配置名稱 / 零件…";
+    return;
+  }
   searchEl.placeholder = "搜尋商品代號 / 陀螺 / 零件 / 中文名…";
   if (activeTab === "products") {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
@@ -464,8 +510,8 @@ function render() {
   renderStats();
   renderList();
   renderDetail();
-  // 手機版：當在「我的收藏」分頁，或 products/parts 已選中項目時，顯示 detail 全螢幕
-  const showMain = activeTab === "mine" || !!selected;
+  // 手機版：當在「我的收藏」分頁，或 products/parts/builds 已選中項目時，顯示 detail 全螢幕
+  const showMain = activeTab === "mine" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
   document.body.classList.toggle("show-detail", showMain);
 }
 
@@ -487,9 +533,41 @@ function renderList() {
     listEl.innerHTML = renderProductList(q);
   } else if (activeTab === "parts") {
     listEl.innerHTML = renderPartList(q);
-  } else {
+  } else if (activeTab === "mine") {
     listEl.innerHTML = renderMineSidebar();
+  } else {
+    listEl.innerHTML = renderBuildsList(q);
   }
+}
+
+function renderBuildsList(q) {
+  const newBtn = `<div class="item" style="background:rgba(78,161,255,0.08); color: var(--accent);" onclick="newBuild()">
+    <span class="check" style="color: var(--accent); font-size:16px;">＋</span>
+    <span class="name" style="color: var(--accent);">新增配置</span>
+  </div>`;
+  const builds = state.builds.filter(b => {
+    if (!q) return true;
+    if (b.name && b.name.toLowerCase().includes(q)) return true;
+    return codeMatches([b.blade, b.ratchet, b.bit].filter(Boolean).join(" "), q);
+  });
+  if (!state.builds.length) {
+    return newBtn + `<div class="empty">還沒有任何配置<br>按上方「+」新增</div>`;
+  }
+  const rows = builds.map(b => {
+    const status = buildStatus(b);
+    const cls = (selected && selected.type === "build" && selected.id === b.id ? " selected" : "") + (status.complete ? " owned" : "");
+    const partsStr = [b.blade, b.ratchet, b.bit].filter(Boolean).join(" ") || "(未設定)";
+    const badge = status.complete ? `<span class="qty" style="background:rgba(46,204,113,0.2); color:var(--owned);">✓</span>`
+                : status.need === 0 ? `<span class="qty">空</span>`
+                : `<span class="qty" style="background:rgba(255,107,107,0.15); color:var(--missing);">缺${status.missing}</span>`;
+    return `<div class="item ${cls}" onclick="select('build','${b.id}')">
+      <span class="check">${status.complete ? "●" : "○"}</span>
+      <span class="name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">${b.name || "(未命名)"}</span>
+      <span style="color:var(--muted); font-size:11px; font-family:monospace; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${partsStr}</span>
+      ${badge}
+    </div>`;
+  }).join("");
+  return newBtn + (rows || `<div class="empty">沒有符合搜尋的配置</div>`);
 }
 
 function renderMineSidebar() {
@@ -651,9 +729,120 @@ function renderDetail() {
   const el = document.getElementById("detail");
   const back = `<div class="mobile-back-bar"><button onclick="goBack()">← 返回</button></div>`;
   if (activeTab === "mine") { el.innerHTML = back + renderCollection(); return; }
+  if (activeTab === "builds") {
+    if (!selected) { el.innerHTML = back + `<div class="empty">← 從左側選配置，或按「+ 新增配置」</div>`; return; }
+    el.innerHTML = back + renderBuildEditor(selected.id);
+    return;
+  }
   if (!selected) { el.innerHTML = `<div class="empty">← 從左側清單選一個項目開始</div>`; return; }
   if (selected.type === "product") el.innerHTML = back + renderProductDetail(PRODUCTS[selected.id]);
   else el.innerHTML = back + renderPartDetail(selected.type, selected.id);
+}
+
+function renderBuildEditor(id) {
+  const b = getBuild(id);
+  if (!b) return `<div class="empty">配置不存在</div>`;
+  const op = ownedParts();
+  const status = buildStatus(b);
+  const slot = (key, label, code, info, nameFn, ownedSet) => {
+    const inf = code ? info(code) : null;
+    const cn = code ? nameFn(code, inf) : "";
+    const ow = code && ownedSet.has(code);
+    const main = code
+      ? `<div style="margin-top:6px; font-size:18px; font-weight:600;">${cn || code}</div>
+         <div style="color:var(--muted); font-size:12px; font-family:monospace; margin-top:2px;">
+           ${code} ${ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`}
+         </div>`
+      : `<div style="margin-top:6px; color:var(--muted);">— 未選 —</div>`;
+    return `<div class="card" style="cursor:pointer" onclick="openPartPicker('${id}','${key}')">
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <h3 style="margin:0; font-size:13px; color:var(--accent2);">${label}</h3>
+        <span style="margin-left:auto; color:var(--muted); font-size:11px;">${code ? "點此變更" : "點此選擇"} ▸</span>
+      </div>
+      ${main}
+      ${code && code !== "" ? `<button onclick="event.stopPropagation(); updateBuildField('${id}','${key}',''); render();" style="margin-top:8px; font-size:11px; padding:3px 8px;" class="danger">清除</button>` : ""}
+    </div>`;
+  };
+  const statusPill = status.need === 0
+    ? `<span class="pill" style="background:var(--panel2);">尚未選擇任何零件</span>`
+    : status.complete ? `<span class="pill owned">✓ 全部擁有，可組裝</span>`
+    : `<span class="pill missing">缺 ${status.missing} 件 / ${status.need}</span>`;
+  return `<div>
+    <div style="display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
+      <input type="text" placeholder="配置名稱 (例: 蒼龍爆刃)" value="${(b.name || '').replace(/"/g, '&quot;')}"
+             oninput="updateBuildField('${id}','name', this.value)"
+             style="flex:1; min-width:160px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+      <button onclick="duplicateBuild('${id}')">🔁 複製</button>
+      <button class="danger" onclick="deleteBuild('${id}')">🗑 刪除</button>
+    </div>
+    <div style="margin-bottom:12px;">${statusPill}</div>
+    ${slot("blade", "⚔️ 戰刃", b.blade, bladeInfo,
+      (c, i) => i && i.isCx ? c : preferredChi(i && i.names && i.names.chi), op.blades)}
+    ${slot("ratchet", "⚙️ 固鎖", b.ratchet, ratchetInfo, () => "", op.ratchets)}
+    ${slot("bit", "🔩 軸", b.bit, bitInfo,
+      (c, i) => preferredChi(i && i.names && i.names.chi), op.bits)}
+    <textarea placeholder="備註 (選填，例: 攻擊型、台場限定…)"
+              oninput="updateBuildField('${id}','note', this.value)"
+              style="width:100%; min-height:60px; margin-top:14px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px; font-family:inherit;">${(b.note || '').replace(/</g, '&lt;')}</textarea>
+  </div>`;
+}
+
+let pickerCtx = null;
+function openPartPicker(buildId, slot) {
+  pickerCtx = { buildId, slot, query: "", onlyOwned: false };
+  renderPartPicker();
+}
+function renderPartPicker() {
+  const ctx = pickerCtx; if (!ctx) return;
+  const op = ownedParts();
+  const all = ctx.slot === "blade" ? [...ALL_BLADES] : ctx.slot === "ratchet" ? [...ALL_RATCHETS] : [...ALL_BITS];
+  const ownedSet = ctx.slot === "blade" ? op.blades : ctx.slot === "ratchet" ? op.ratchets : op.bits;
+  const info = ctx.slot === "blade" ? bladeInfo : ctx.slot === "ratchet" ? ratchetInfo : bitInfo;
+  const nameFn = ctx.slot === "ratchet" ? () => "" : (c) => { const i = info(c); return i.isCx ? "" : preferredChi(i.names && i.names.chi); };
+  const filtered = all.filter(c => {
+    if (ctx.onlyOwned && !ownedSet.has(c)) return false;
+    if (!ctx.query) return true;
+    const inf = info(c);
+    const chi = inf.names ? inf.names.chi || "" : "";
+    const eng = inf.names ? inf.names.eng || "" : "";
+    return codeMatches(c, ctx.query) || codeMatches(eng, ctx.query) || chiMatches(chi, ctx.query);
+  }).sort();
+  const slotName = ctx.slot === "blade" ? "戰刃" : ctx.slot === "ratchet" ? "固鎖" : "軸";
+  showModal(`選擇 ${slotName}`, `
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+      <input type="search" id="picker-q" placeholder="搜尋代號或中文名..." value="${ctx.query.replace(/"/g,'&quot;')}"
+             oninput="pickerCtx.query = this.value; renderPartPicker();"
+             style="flex:1; min-width:160px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+      <label style="display:flex; align-items:center; gap:4px; color:var(--muted); font-size:12px; white-space:nowrap;">
+        <input type="checkbox" ${ctx.onlyOwned ? 'checked' : ''} onchange="pickerCtx.onlyOwned = this.checked; renderPartPicker();"> 只看擁有
+      </label>
+    </div>
+    <div style="max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:6px;">
+      ${filtered.length === 0 ? `<div class="empty" style="padding:20px;">沒有符合條件</div>`
+        : filtered.map(c => {
+          const inf = info(c);
+          const cn = nameFn(c, inf);
+          const ow = ownedSet.has(c);
+          return `<div class="item ${ow ? 'owned' : ''}" style="padding:8px 12px; cursor:pointer;" onclick="pickPart('${escapeAttr(c)}')">
+            <span class="check">${ow ? '●' : '○'}</span>
+            <span class="name">${cn || c}</span>
+            ${cn ? `<span style="margin-left:auto; color:var(--muted); font-family:monospace; font-size:11px;">${c}</span>` : ''}
+          </div>`;
+        }).join("")}
+    </div>
+  `, [
+    { label: "取消", action: () => { pickerCtx = null; closeModal(); } }
+  ]);
+  setTimeout(() => { const e = document.getElementById("picker-q"); if (e) e.focus(); }, 30);
+}
+function pickPart(code) {
+  const ctx = pickerCtx; if (!ctx) return;
+  const b = getBuild(ctx.buildId); if (!b) return;
+  b[ctx.slot] = code;
+  saveState();
+  pickerCtx = null;
+  closeModal();
+  render();
 }
 
 function goBack() {
@@ -944,6 +1133,7 @@ async function switchExportFormat(fmt) {
     schema: "beyx_collection", version: 1,
     exportedAt: new Date().toISOString(),
     owned: state.owned,
+    builds: state.builds || [],
   };
   const json = JSON.stringify(exportData, null, fmt === "json" ? 2 : 0);
   const ta = document.getElementById("io-text");
@@ -953,7 +1143,7 @@ async function switchExportFormat(fmt) {
     hint.textContent = `JSON 格式，${json.length} 字元。可直接看內容、易於版本控制。`;
   } else {
     ta.value = "壓縮中…";
-    const code = await compressToShortCode(JSON.stringify({ schema: "beyx_collection", version: 1, owned: state.owned }));
+    const code = await compressToShortCode(JSON.stringify({ schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [] }));
     ta.value = code;
     hint.textContent = `短碼格式，${code.length} 字元 (壓縮率 ${(code.length / json.length * 100).toFixed(0)}%)。一行字串，方便分享/備份。`;
   }
@@ -1023,10 +1213,15 @@ async function doImport(replace) {
     added++;
   });
   state.owned = next;
+  // 一併匯入配置 (builds)
+  if (Array.isArray(data.builds)) {
+    state.builds = replace ? data.builds : [...(state.builds || []), ...data.builds];
+  }
   saveState();
   closeModal();
   render();
-  alert(`匯入完成：套用 ${added} 筆${skipped ? `，略過 ${skipped} 筆無效 id` : ""}`);
+  alert(`匯入完成：套用 ${added} 筆${skipped ? `，略過 ${skipped} 筆無效 id` : ""}` +
+    (Array.isArray(data.builds) ? `\n配置：${data.builds.length} 筆` : ""));
 }
 
 function clearAll() {
