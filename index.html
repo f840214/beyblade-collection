@@ -195,6 +195,7 @@
     <div class="tabs">
       <div class="tab active" data-tab="products" onclick="switchTab('products')">商品</div>
       <div class="tab" data-tab="parts" onclick="switchTab('parts')">零件</div>
+      <div class="tab" data-tab="mine" onclick="switchTab('mine')">我的收藏</div>
     </div>
     <div class="toolbar">
       <input type="search" id="search" placeholder="搜尋商品代號 / 陀螺 / 零件 / 中文名…" oninput="render()">
@@ -287,6 +288,23 @@ function isEmptyPart(code) {
   return !code || !code.replace(/[\/\.]/g, "").length;
 }
 
+// 商品種類代號 → 中文。第二段 H 表示異色版／再推出。
+const PRODUCT_TYPE_NAMES = {
+  "S":  "起始包",
+  "B":  "補充包",
+  "St": "套組",
+  "SS": "對戰盤套組",
+  "RB": "隨機補充包",
+  "Lm": "限定",
+};
+function productTypeName(code) {
+  if (!code) return "";
+  const parts = code.split(/\s+/);
+  const main = PRODUCT_TYPE_NAMES[parts[0]] || parts[0];
+  const isHasbro = parts.includes("H");
+  return isHasbro ? main + "・異色版" : main;
+}
+
 function bladeName(code) {
   const b = bladeInfo(code);
   if (b.isCx) return code;
@@ -374,6 +392,13 @@ function switchTab(tab) {
 
 function buildFilters() {
   const wrap = document.getElementById("filters");
+  const searchEl = document.getElementById("search");
+  if (activeTab === "mine") {
+    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">點左側類別跳到對應段落</span>`;
+    searchEl.placeholder = "在我的收藏中搜尋…";
+    return;
+  }
+  searchEl.placeholder = "搜尋商品代號 / 陀螺 / 零件 / 中文名…";
   if (activeTab === "products") {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
     wrap.innerHTML = `
@@ -413,9 +438,28 @@ function renderList() {
   const listEl = document.getElementById("list");
   if (activeTab === "products") {
     listEl.innerHTML = renderProductList(q);
-  } else {
+  } else if (activeTab === "parts") {
     listEl.innerHTML = renderPartList(q);
+  } else {
+    listEl.innerHTML = renderMineSidebar();
   }
+}
+
+function renderMineSidebar() {
+  const op = ownedParts();
+  const ownedProdCount = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id))).length;
+  const sections = [
+    { key: "products", label: "🎁 商品", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
+    { key: "blade",    label: "⚔️ Blade 戰刃", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
+    { key: "ratchet",  label: "⚙️ 固鎖",       n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
+    { key: "bit",      label: "🔩 軸",         n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
+  ];
+  return `<div class="group"><div class="group-body">` +
+    sections.map(s => `<div class="item ${s.n > 0 ? "owned" : ""}" onclick="document.getElementById('${s.anchor}').scrollIntoView({behavior:'smooth', block:'start'})">
+      <span class="name">${s.label}</span>
+      <span class="qty">${s.n} / ${s.total}</span>
+    </div>`).join("") +
+    `</div></div>`;
 }
 
 function renderProductList(q) {
@@ -441,7 +485,7 @@ function renderProductList(q) {
       return `<div class="item ${cls}" onclick="select('product','${p.id}')">
         <span class="check">${ownedV === total ? "●" : ownedV > 0 ? "◐" : "○"}</span>
         <span class="name">${p.id}</span>
-        <span style="color:var(--muted); font-size:11px;">${p.type}</span>
+        <span style="color:var(--muted); font-size:11px;" title="${p.type}">${productTypeName(p.type)}</span>
         <span class="qty">${ownedV}/${total}</span>
       </div>`;
     }).join("");
@@ -523,9 +567,89 @@ function select(type, id) {
 
 function renderDetail() {
   const el = document.getElementById("detail");
+  if (activeTab === "mine") { el.innerHTML = renderCollection(); return; }
   if (!selected) { el.innerHTML = `<div class="empty">← 從左側清單選一個項目開始</div>`; return; }
   if (selected.type === "product") el.innerHTML = renderProductDetail(PRODUCTS[selected.id]);
   else el.innerHTML = renderPartDetail(selected.type, selected.id);
+}
+
+function renderCollection() {
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const op = ownedParts();
+  const ownedProducts = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id)));
+
+  // 商品段
+  const productsHtml = ownedProducts.length === 0
+    ? `<div class="empty" style="padding: 20px;">還沒有任何擁有的商品</div>`
+    : ownedProducts
+        .filter(p => !q || p.id.toLowerCase().includes(q) || p.variants.some(v => isOwned(v.id) && variantMatches(v, q)))
+        .map(p => {
+          const ownedVars = p.variants.filter(v => isOwned(v.id));
+          return `<div class="card" style="cursor:pointer" onclick="switchTab('products'); select('product','${p.id}')">
+            <div style="display:flex; align-items:baseline; gap:8px;">
+              <h3 style="margin:0; color: var(--text);">${p.id}</h3>
+              <span style="color:var(--muted); font-size:12px;" title="${p.type}">${productTypeName(p.type)}</span>
+              <span class="pill owned" style="margin-left:auto;">${ownedVars.length}/${p.variants.length}</span>
+            </div>
+            <div style="margin-top:6px; color: var(--muted); font-size:12px;">
+              ${ownedVars.map(v => {
+                const showB = isEmptyPart(v.blade) ? "—" : v.blade;
+                const showR = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
+                const showI = isEmptyPart(v.bit) ? "—" : v.bit;
+                const qty = ownedQty(v.id);
+                return `<div>${showB} ${showR} ${showI}${qty > 1 ? ` ×${qty}` : ""}</div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        }).join("");
+
+  // 零件段
+  const partSection = (title, anchor, ownedSet, info, nameFn) => {
+    const items = [...ownedSet].sort();
+    if (items.length === 0) {
+      return `<h2 id="${anchor}" style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">0</span></h2>
+        <div class="empty" style="padding: 20px;">還沒有任何擁有的零件</div>`;
+    }
+    const filtered = q ? items.filter(c => {
+      const inf = info(c);
+      const n = (inf.names ? inf.names.chi || inf.names.eng || "" : "");
+      return c.toLowerCase().includes(q) || n.toLowerCase().includes(q);
+    }) : items;
+    return `<h2 id="${anchor}" style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">${items.length}</span></h2>` +
+      filtered.map(code => {
+        const inf = info(code);
+        const sources = (PART_SOURCES[anchor.replace("mine-","")][code] || []);
+        const ownedSources = sources.filter(v => isOwned(v.id));
+        const display = nameFn(code, inf);
+        return `<div class="card">
+          <div style="display:flex; align-items:baseline; gap:8px;">
+            <h3 style="margin:0; color:var(--text); font-family:monospace;">${code}</h3>
+            <span style="color: var(--muted); font-size:13px;">${display}</span>
+          </div>
+          ${inf.desc ? `<div class="desc">${inf.desc}</div>` : ""}
+          <div style="margin-top:8px;">
+            <div style="color: var(--muted); font-size:11px; margin-bottom:4px;">來自（已擁有 ${ownedSources.length} / ${sources.length}）：</div>
+            <div class="source-list">
+              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')">${v.productId} · ${v.raw}</span>`).join("")}
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+  };
+
+  const bladeSec = partSection("⚔️ Blade 戰刃", "mine-blade", op.blades, bladeInfo,
+    (c, inf) => inf.isCx ? "(CX 組合)" : (inf.names && inf.names.chi || ""));
+  const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, (c) => c);
+  const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
+    (c, inf) => inf.names && inf.names.chi || "");
+
+  return `<div>
+    <h2 id="mine-products" style="margin-top:0;">🎁 我擁有的商品 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">${productsHtml}</div>
+    ${bladeSec}
+    ${ratchetSec}
+    ${bitSec}
+  </div>`;
 }
 
 function renderProductDetail(p) {
@@ -555,7 +679,7 @@ function renderProductDetail(p) {
     </div>`;
   }).join("");
   return `<div>
-    <h2>${p.id} <span style="color:var(--muted); font-size: 13px;">${p.type}</span></h2>
+    <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span></h2>
     <div class="sub">擁有 ${ownedV}/${p.variants.length} 變體</div>
     <div class="variants">${variants}</div>
   </div>`;
