@@ -281,6 +281,12 @@ function bladeInfo(code) {
 function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
 
+// 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
+// CX 還會用 "/./.X" 形式 — 只要拆掉 "/" 和 "." 後沒剩任何字元就是空
+function isEmptyPart(code) {
+  return !code || !code.replace(/[\/\.]/g, "").length;
+}
+
 function bladeName(code) {
   const b = bladeInfo(code);
   if (b.isCx) return code;
@@ -293,22 +299,22 @@ function bitName(code) {
   return c || code;
 }
 
-// 由所有資料統計可獲得的零件
+// 由所有資料統計可獲得的零件 (排除 "/" 等占位符)
 const ALL_BLADES = new Set();
 const ALL_RATCHETS = new Set();
 const ALL_BITS = new Set();
 VARIANTS.forEach(v => {
-  ALL_BLADES.add(v.blade);
-  ALL_RATCHETS.add(v.ratchet);
-  ALL_BITS.add(v.bit);
+  if (!isEmptyPart(v.blade))   ALL_BLADES.add(v.blade);
+  if (!isEmptyPart(v.ratchet)) ALL_RATCHETS.add(v.ratchet);
+  if (!isEmptyPart(v.bit))     ALL_BITS.add(v.bit);
 });
 
 // 從零件 → 變體列表
 const PART_SOURCES = { blade: {}, ratchet: {}, bit: {} };
 VARIANTS.forEach(v => {
-  (PART_SOURCES.blade[v.blade] = PART_SOURCES.blade[v.blade] || []).push(v);
-  (PART_SOURCES.ratchet[v.ratchet] = PART_SOURCES.ratchet[v.ratchet] || []).push(v);
-  (PART_SOURCES.bit[v.bit] = PART_SOURCES.bit[v.bit] || []).push(v);
+  if (!isEmptyPart(v.blade))   (PART_SOURCES.blade[v.blade]     = PART_SOURCES.blade[v.blade]     || []).push(v);
+  if (!isEmptyPart(v.ratchet)) (PART_SOURCES.ratchet[v.ratchet] = PART_SOURCES.ratchet[v.ratchet] || []).push(v);
+  if (!isEmptyPart(v.bit))     (PART_SOURCES.bit[v.bit]         = PART_SOURCES.bit[v.bit]         || []).push(v);
 });
 
 // ============================================================
@@ -341,7 +347,9 @@ function ownedParts() {
   Object.keys(state.owned).forEach(vid => {
     const v = VARIANTS.find(x => x.id === vid);
     if (!v) return;
-    blades.add(v.blade); ratchets.add(v.ratchet); bits.add(v.bit);
+    if (!isEmptyPart(v.blade))   blades.add(v.blade);
+    if (!isEmptyPart(v.ratchet)) ratchets.add(v.ratchet);
+    if (!isEmptyPart(v.bit))     bits.add(v.bit);
   });
   return { blades, ratchets, bits };
 }
@@ -524,10 +532,13 @@ function renderProductDetail(p) {
   if (!p) return `<div class="empty">找不到商品</div>`;
   const ownedV = p.variants.filter(v => isOwned(v.id)).length;
   const variants = p.variants.map((v, i) => {
-    const blade = bladeInfo(v.blade);
-    const bit = bitInfo(v.bit);
-    const bChi = blade.isCx ? "" : bladeName(v.blade);
-    const bitChi = bitName(v.bit);
+    const showBlade   = isEmptyPart(v.blade)   ? "—" : v.blade;
+    const showRatchet = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
+    const showBit     = isEmptyPart(v.bit)     ? "—" : v.bit;
+    const blade = isEmptyPart(v.blade) ? null : bladeInfo(v.blade);
+    const bChi = blade ? (blade.isCx ? "" : bladeName(v.blade)) : "";
+    const bitChi = isEmptyPart(v.bit) ? "" : bitName(v.bit);
+    const subParts = [bChi, !isEmptyPart(v.ratchet) ? v.ratchet : "", bitChi].filter(Boolean).join(" · ") || "(單獨零件包)";
     const get = v.opts.get;
     const coat = v.opts.coat;
     const qty = ownedQty(v.id);
@@ -535,8 +546,8 @@ function renderProductDetail(p) {
     return `<div class="variant ${owned ? "owned" : ""}">
       <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       <div>
-        <div class="vbey">${v.blade} ${v.ratchet} ${v.bit}</div>
-        <div class="vparts">${bChi} · ${v.ratchet} · ${bitChi}${get ? ` · 每箱 ${get} 盒` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
+        <div class="vbey">${showBlade} ${showRatchet} ${showBit}</div>
+        <div class="vparts">${subParts}${get ? ` · 每箱 ${get} 盒` : ""}${coat ? ` · 配色 ${coat}` : ""}</div>
       </div>
       <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
       <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
