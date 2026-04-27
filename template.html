@@ -511,16 +511,27 @@ function renderProductList(q) {
   return html.join("") || `<div class="empty">沒有符合條件的商品</div>`;
 }
 
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// 代號用「字界開頭」比對 (R 不會撈到 DrSt)，中文用子字串
+function codeMatches(text, q) {
+  if (!text) return false;
+  return new RegExp("(?:^|[^A-Za-z0-9])" + escapeRegex(q), "i").test(text);
+}
+function chiMatches(text, q) {
+  return text && text.toLowerCase().includes(q.toLowerCase());
+}
+
 function productMatches(p, q) {
   if (!q) return true;
-  if (p.id.toLowerCase().includes(q)) return true;
+  if (codeMatches(p.id, q)) return true;
   return p.variants.some(v => variantMatches(v, q));
 }
 
 function variantMatches(v, q) {
-  return v.raw.toLowerCase().includes(q)
-    || bladeName(v.blade).toLowerCase().includes(q)
-    || bitName(v.bit).toLowerCase().includes(q);
+  return codeMatches(v.raw, q)
+    || chiMatches(bladeName(v.blade), q)
+    || chiMatches(bitName(v.bit), q);
 }
 
 function renderPartList(q) {
@@ -537,8 +548,9 @@ function renderPartList(q) {
       if (filterOpts.missingOnly && isO) return false;
       if (q) {
         const info = sec.info(code);
-        const nameStr = (info.names ? info.names.chi || info.names.eng || "" : "") + " " + code;
-        if (!nameStr.toLowerCase().includes(q)) return false;
+        const chi = info.names ? info.names.chi || "" : "";
+        const eng = info.names ? info.names.eng || "" : "";
+        if (!codeMatches(code, q) && !codeMatches(eng, q) && !chiMatches(chi, q)) return false;
       }
       return true;
     });
@@ -596,7 +608,7 @@ function renderCollection() {
   const productsHtml = ownedProducts.length === 0
     ? `<div class="empty" style="padding: 20px;">還沒有任何擁有的商品</div>`
     : ownedProducts
-        .filter(p => !q || p.id.toLowerCase().includes(q) || p.variants.some(v => isOwned(v.id) && variantMatches(v, q)))
+        .filter(p => !q || codeMatches(p.id, q) || p.variants.some(v => isOwned(v.id) && variantMatches(v, q)))
         .map(p => {
           const ownedVars = p.variants.filter(v => isOwned(v.id));
           return `<div class="card" style="cursor:pointer" onclick="switchTab('products'); select('product','${p.id}')">
@@ -630,8 +642,9 @@ function renderCollection() {
     }
     const filtered = q ? items.filter(c => {
       const inf = info(c);
-      const n = (inf.names ? inf.names.chi || inf.names.eng || "" : "");
-      return c.toLowerCase().includes(q) || n.toLowerCase().includes(q);
+      const chi = inf.names ? inf.names.chi || "" : "";
+      const eng = inf.names ? inf.names.eng || "" : "";
+      return codeMatches(c, q) || codeMatches(eng, q) || chiMatches(chi, q);
     }) : items;
     return `<h2 id="${anchor}" style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">${items.length}</span></h2>` +
       filtered.map(code => {
