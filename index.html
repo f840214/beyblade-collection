@@ -242,7 +242,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.36</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.37</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -725,6 +725,34 @@ function findCxSegmentByName(name) {
   return null;
 }
 
+// 排行榜戰刃名字 → 是否被任一已擁有戰刃涵蓋
+// (單片名字相符；或 CX 組合名 / 段名跟某個擁有的 CX 戰刃對得上)
+function tierIsBladeOwned(name, ownedBlades) {
+  const stripped = tierStripMarkers(name);
+  if (!stripped || !ownedBlades.size) return false;
+  const candidates = stripped.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+  for (const cand of candidates) {
+    let seg = null;
+    for (const code of ownedBlades) {
+      if (!code.includes(".") && !code.includes("/")) {
+        if (bladeAllNames(code).includes(cand)) return true;
+      } else {
+        if (bladeName(code) === cand) return true;
+        if (seg === null) seg = findCxSegmentByName(cand) || false;
+        if (seg && code.split(".").includes(seg.code)) return true;
+      }
+    }
+  }
+  // 模糊比對 — 單片
+  for (const cand of candidates) {
+    for (const code of ownedBlades) {
+      if (code.includes(".") || code.includes("/")) continue;
+      if (bladeAllNames(code).some(n => n && (n.includes(cand) || cand.includes(n)))) return true;
+    }
+  }
+  return false;
+}
+
 // 排行榜戰刃名字 → 跳轉目標。回傳 {kind:"blade",id} 或 {kind:"product",id} 或 null
 function tierBladeMatch(name) {
   const stripped = tierStripMarkers(name);
@@ -782,8 +810,9 @@ function renderTier() {
       <span class="tier-label tier-${label.replace(".", "-")}">${label}</span>
       <div class="tier-pills">${filtered.map(name => {
         const m = tierBladeMatch(name);
-        const owned = m && m.kind === "blade" && op.blades.has(m.id);
-        const cls = (showOwned && owned) ? "owned" : "";
+        const owned = tierIsBladeOwned(name, op.blades);
+        const ghost = showOwned && !owned;
+        const cls = (showOwned && owned) ? "owned" : (ghost ? "missing" : "");
         if (m) {
           const args = `'${m.kind}','${String(m.id).replace(/'/g, "\\'")}'`;
           return `<span class="tier-pill ${cls}" onclick="tierJumpToBlade(${args})" title="點此跳到對應${m.kind === "product" ? "商品" : "戰刃"}">${name}</span>`;
