@@ -16,6 +16,7 @@ const db = {
   bladeDivided: load("part-blade-divided.json"),
   ratchet:       load("part-ratchet.json"),
   bit:           load("part-bit.json"),
+  tier:          load("tier.json"),
 };
 
 // 版本號: v0.{commit數+1}; 還沒 commit 過就用 dev

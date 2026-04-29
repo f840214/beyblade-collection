@@ -154,6 +154,37 @@
 
   .empty { color: var(--muted); padding: 30px; text-align: center; }
 
+  .tier-row {
+    display: grid; grid-template-columns: 60px 1fr; gap: 12px;
+    align-items: start; padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .tier-row:first-of-type { border-top: none; }
+  .tier-label {
+    font-weight: 700; font-size: 13px; padding: 4px 8px;
+    border-radius: 4px; background: var(--panel2); color: var(--muted);
+    text-align: center; min-width: 44px;
+  }
+  .tier-T0    { background: #6b1f2a; color: #ffd0d8; }
+  .tier-T0-5  { background: #5a2a44; color: #ffceec; }
+  .tier-T1    { background: #5a4711; color: #ffe5a1; }
+  .tier-T1-5  { background: #424a14; color: #e9f0a8; }
+  .tier-T2    { background: #1a4f30; color: #b8ffd1; }
+  .tier-T3    { background: #1c4564; color: #b8d8ff; }
+  .tier-T4    { background: #34324a; color: #c2c0e0; }
+  .tier-T5    { background: #2a2f3a; color: #8a93a3; }
+  .tier-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tier-pill {
+    padding: 3px 8px; border-radius: 12px; font-size: 12px;
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border);
+    cursor: default;
+  }
+  .tier-pill.owned { background: rgba(46,204,113,0.15); color: var(--owned); border-color: var(--owned); }
+  .tier-pill.missing { opacity: 0.4; }
+  .tier-pill[onclick] { cursor: pointer; }
+  .tier-pill[onclick]:hover { background: #2a3040; }
+
   .source-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .source-list .src {
     padding: 2px 8px; border-radius: 4px; background: var(--panel2);
@@ -227,6 +258,7 @@
       <div class="tab" data-tab="parts" onclick="switchTab('parts')">零件</div>
       <div class="tab" data-tab="mine" onclick="switchTab('mine')">我的收藏</div>
       <div class="tab" data-tab="builds" onclick="switchTab('builds')">配置</div>
+      <div class="tab" data-tab="tier" onclick="switchTab('tier')">排行榜</div>
     </div>
     <div class="toolbar">
       <input type="search" id="search" placeholder="搜尋商品代號 / 陀螺 / 零件 / 中文名…" oninput="render()">
@@ -521,6 +553,11 @@ function buildFilters() {
     searchEl.placeholder = "在我的收藏中搜尋…";
     return;
   }
+  if (activeTab === "tier") {
+    wrap.innerHTML = `<label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; render()"> 標示已擁有的零件</label>`;
+    searchEl.placeholder = "在排行榜中搜尋…";
+    return;
+  }
   if (activeTab === "builds") {
     wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">儲存並追蹤你的陀螺組合</span>`;
     searchEl.placeholder = "搜尋配置名稱 / 零件…";
@@ -549,7 +586,7 @@ function render() {
   renderList();
   renderDetail();
   // 手機版：當在「我的收藏」分頁，或 products/parts/builds 已選中項目時，顯示 detail 全螢幕
-  const showMain = activeTab === "mine" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
+  const showMain = activeTab === "mine" || activeTab === "tier" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
   document.body.classList.toggle("show-detail", showMain);
 }
 
@@ -573,6 +610,8 @@ function renderList() {
     listEl.innerHTML = renderPartList(q);
   } else if (activeTab === "mine") {
     listEl.innerHTML = renderMineSidebar();
+  } else if (activeTab === "tier") {
+    listEl.innerHTML = renderTierSidebar();
   } else {
     listEl.innerHTML = renderBuildsList(q);
   }
@@ -623,6 +662,93 @@ function renderMineSidebar() {
       <span class="qty">${s.n} / ${s.total}</span>
     </div>`).join("") +
     `</div></div>`;
+}
+
+function renderTierSidebar() {
+  const sections = [
+    { label: "⚔️ 戰刃", anchor: "tier-blade" },
+    { label: "⚙️ 固鎖", anchor: "tier-ratchet" },
+    { label: "🔩 軸",   anchor: "tier-bit" },
+  ];
+  return `<div class="group"><div class="group-body">` +
+    sections.map(s => `<div class="item" onclick="document.getElementById('${s.anchor}').scrollIntoView({behavior:'smooth', block:'start'})">
+      <span class="name">${s.label}</span>
+    </div>`).join("") +
+    `</div></div>`;
+}
+
+// 排行榜：blade 名稱比對的時候，把 (BX)/(CX)/(復刻) 等標記跟空白都先剝掉
+function tierStripMarkers(s) {
+  return s.replace(/\s*\([^)]*\)\s*/g, "").replace(/\s*—.*$/, "").trim();
+}
+// 把 blade 排行榜上的名字，盡力對到 ALL_BLADES 中的某個代號 (用來標示已擁有)
+function tierBladeOwnedMatch(name, ownedBlades) {
+  const stripped = tierStripMarkers(name);
+  const candidates = stripped.split(/\s*\/\s*/);
+  for (const cand of candidates) {
+    for (const code of ownedBlades) {
+      const dn = bladeName(code);
+      if (dn && (dn === cand || dn.includes(cand) || cand.includes(dn))) return true;
+    }
+  }
+  return false;
+}
+
+function renderTier() {
+  const tier = DB.tier || {};
+  const op = ownedParts();
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const showOwned = filterOpts.ownedOnly;
+  const tierOrder = ["T0", "T0.5", "T1", "T1.5", "T2", "T3", "T4", "T5"];
+
+  const matchQuery = (text) => !q || (text && text.toLowerCase().includes(q));
+
+  const renderBladeRow = (label, items) => {
+    const filtered = items.filter(matchQuery);
+    if (!filtered.length) return "";
+    return `<div class="tier-row">
+      <span class="tier-label tier-${label.replace(".", "-")}">${label}</span>
+      <div class="tier-pills">${filtered.map(name => {
+        const owned = showOwned && tierBladeOwnedMatch(name, op.blades);
+        return `<span class="tier-pill ${owned ? "owned" : ""}">${name}</span>`;
+      }).join("")}</div>
+    </div>`;
+  };
+
+  const renderPartRow = (label, codes, ownedSet, suffix) => {
+    const filtered = codes.filter(c => matchQuery(c) || matchQuery((c + (suffix || ""))));
+    if (!filtered.length) return "";
+    return `<div class="tier-row">
+      <span class="tier-label tier-${label.replace(".", "-")}">${label}</span>
+      <div class="tier-pills">${filtered.map(code => {
+        const owned = ownedSet.has(code);
+        const ghost = showOwned && !owned;
+        const cls = (showOwned && owned) ? "owned" : (ghost ? "missing" : "");
+        const display = code + (suffix || "");
+        return `<span class="tier-pill ${cls}" onclick="tierJumpToPart('${code.replace(/'/g, "\\'")}', '${suffix ? "bit" : "ratchet"}')" title="點此跳到零件">${display}</span>`;
+      }).join("")}</div>
+    </div>`;
+  };
+
+  const bladeSection = `<h2 id="tier-blade" style="margin-top:0;">⚔️ 戰刃 排行榜</h2>` +
+    tierOrder.map(t => tier.blade && tier.blade[t] ? renderBladeRow(t, tier.blade[t]) : "").join("");
+
+  const ratchetSection = `<h2 id="tier-ratchet" style="margin-top:24px;">⚙️ 固鎖 排行榜</h2>` +
+    tierOrder.map(t => tier.ratchet && tier.ratchet[t] ? renderPartRow(t, tier.ratchet[t], op.ratchets, "") : "").join("");
+
+  const bitSection = `<h2 id="tier-bit" style="margin-top:24px;">🔩 軸 排行榜</h2>` +
+    tierOrder.map(t => tier.bit && tier.bit[t] ? renderPartRow(t, tier.bit[t], op.bits, "軸") : "").join("");
+
+  return `<div>${bladeSection}${ratchetSection}${bitSection}</div>`;
+}
+
+function tierJumpToPart(code, kind) {
+  if (!code) return;
+  // 確認該零件確實存在於 ALL_*，否則 select 會跑到不存在的細節頁
+  const set = kind === "bit" ? ALL_BITS : ALL_RATCHETS;
+  if (!set.has(code)) return;
+  switchTab("parts");
+  select(kind, code);
 }
 
 function renderProductList(q) {
@@ -770,6 +896,7 @@ function renderDetail() {
   const el = document.getElementById("detail");
   const back = `<div class="mobile-back-bar"><button onclick="goBack()">← 返回</button></div>`;
   if (activeTab === "mine") { el.innerHTML = back + renderCollection(); return; }
+  if (activeTab === "tier") { el.innerHTML = back + renderTier(); return; }
   if (activeTab === "builds") {
     if (!selected) { el.innerHTML = back + `<div class="empty">← 從左側選配置，或按「+ 新增配置」</div>`; return; }
     el.innerHTML = back + renderBuildEditor(selected.id);
@@ -895,6 +1022,7 @@ function pickPart(code) {
 
 function goBack() {
   if (activeTab === "mine") { switchTab("products"); return; }
+  if (activeTab === "tier") { switchTab("products"); return; }
   selected = null;
   render();
 }
