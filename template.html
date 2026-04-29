@@ -399,10 +399,11 @@ function productTypeName(code) {
 }
 
 // chi 欄位格式為「港譯 台譯」(以空白分隔)，取最後一段=台譯
+// 名字內的 "\" 是 chip\main 結構分隔符，顯示時拿掉 (e.g. "空力\天馬" → "空力天馬")
 function preferredChi(c) {
   if (!c) return "";
   const tokens = c.split(/\s+/).filter(Boolean);
-  return tokens[tokens.length - 1] || "";
+  return (tokens[tokens.length - 1] || "").replace(/\\/g, "");
 }
 function bladeName(code) {
   const b = bladeInfo(code);
@@ -686,17 +687,55 @@ function tierStripMarkers(s) {
     .trim();
 }
 
+// 把 chi 欄位的所有可能名字 (港譯/台譯/aka) 列出來，全部去掉 "\"
+function bladeAllNames(code) {
+  if (code.includes(".") || code.includes("/")) {
+    const info = bladeInfo(code);
+    const chi = info.names && info.names.chi;
+    return chi ? [chi.replace(/\\/g, "")] : [];
+  }
+  const info = (DB.blade && DB.blade[code]) || (DB.bladeCollab && DB.bladeCollab[code]);
+  if (!info || !info.names) return [];
+  const out = new Set();
+  ["chi", "aka"].forEach(f => {
+    const v = info.names[f];
+    if (!v) return;
+    v.split(/\s+/).forEach(t => { if (t) out.add(t.replace(/\\/g, "")); });
+  });
+  return [...out];
+}
+
+// 找哪個 CX 段名 (chip/metal/main/over/assist/hasbro) 對到此名字。
+// 也支援直接以代號比對 (e.g. "W" 對到 assist W，因 assist 沒中文名)。
+function findCxSegmentByName(name) {
+  const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
+  const cats = ["chip", "metal", "main", "over", "assist", "hasbro"];
+  for (const cat of cats) {
+    if (!cx[cat]) continue;
+    for (const [code, info] of Object.entries(cx[cat])) {
+      const chi = info.names && info.names.chi;
+      if (!chi) continue;
+      const tokens = chi.split(/\s+/).map(t => t.replace(/\\/g, ""));
+      if (tokens.includes(name)) return { code, cat };
+    }
+  }
+  for (const cat of cats) {
+    if (cx[cat] && cx[cat][name]) return { code: name, cat };
+  }
+  return null;
+}
+
 // 排行榜戰刃名字 → 跳轉目標。回傳 {kind:"blade",id} 或 {kind:"product",id} 或 null
 function tierBladeMatch(name) {
   const stripped = tierStripMarkers(name);
   if (!stripped) return null;
   const candidates = stripped.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
   if (!candidates.length) return null;
-  // 1. 完全相符的單片戰刃
+  // 1. 完全相符的單片戰刃 (chi/aka 各 token)
   for (const cand of candidates) {
     for (const code of ALL_BLADES) {
       if (code.includes(".") || code.includes("/")) continue;
-      if (bladeName(code) === cand) return { kind: "blade", id: code };
+      if (bladeAllNames(code).includes(cand)) return { kind: "blade", id: code };
     }
   }
   // 2. 完全相符的 CX 組合戰刃 (跳到第一個含此組合的商品)
@@ -707,12 +746,21 @@ function tierBladeMatch(name) {
       if (bladeName(v.blade) === cand) return { kind: "product", id: v.productId };
     }
   }
-  // 3. 模糊比對 (子字串) — 只用單片戰刃
+  // 3. CX 段名 fallback (e.g. 狂怒→metal Rg, W→assist W) — 找一個含此段的商品
+  for (const cand of candidates) {
+    const seg = findCxSegmentByName(cand);
+    if (!seg) continue;
+    for (const v of VARIANTS) {
+      if (isEmptyPart(v.blade) || !v.blade.includes(".")) continue;
+      if (v.blade.split(".").includes(seg.code)) return { kind: "product", id: v.productId };
+    }
+  }
+  // 4. 模糊比對 (子字串) — 單片戰刃
   for (const cand of candidates) {
     for (const code of ALL_BLADES) {
       if (code.includes(".") || code.includes("/")) continue;
-      const bn = bladeName(code);
-      if (bn && (bn.includes(cand) || cand.includes(bn))) return { kind: "blade", id: code };
+      const names = bladeAllNames(code);
+      if (names.some(n => n && (n.includes(cand) || cand.includes(n)))) return { kind: "blade", id: code };
     }
   }
   return null;
@@ -1271,7 +1319,7 @@ function renderPartDetail(type, code) {
       <h3>零件資訊</h3>
       ${names.jap ? `<div class="row"><span class="k">日文</span><span class="v">${names.jap}</span></div>` : ""}
       ${names.eng ? `<div class="row"><span class="k">英文</span><span class="v">${names.eng}</span></div>` : ""}
-      ${names.chi ? `<div class="row"><span class="k">中文</span><span class="v">${names.chi}</span></div>` : ""}
+      ${names.chi ? `<div class="row"><span class="k">中文</span><span class="v">${names.chi.replace(/\\/g, "")}</span></div>` : ""}
       ${attr.length ? `<div class="row"><span class="k">屬性</span><span class="v">${attr.map(a => `<span class="pill ${a}">${a}</span>`).join("")}</span></div>` : ""}
       ${stat.length ? `<div class="row"><span class="k">數據</span><span class="v" style="font-family:monospace">${stat.join(" / ")}</span></div>` : ""}
       ${info.desc ? `<div class="desc">${info.desc}</div>` : ""}
