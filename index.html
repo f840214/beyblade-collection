@@ -242,7 +242,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.34</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.35</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -256,7 +256,7 @@
     <div class="tabs">
       <div class="tab active" data-tab="products" onclick="switchTab('products')">商品</div>
       <div class="tab" data-tab="parts" onclick="switchTab('parts')">零件</div>
-      <div class="tab" data-tab="mine" onclick="switchTab('mine')">我的收藏</div>
+      <div class="tab" data-tab="mine" onclick="switchTab('mine')">收藏</div>
       <div class="tab" data-tab="builds" onclick="switchTab('builds')">配置</div>
       <div class="tab" data-tab="tier" onclick="switchTab('tier')">排行榜</div>
     </div>
@@ -550,7 +550,7 @@ function buildFilters() {
   const searchEl = document.getElementById("search");
   if (activeTab === "mine") {
     wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">點左側類別跳到對應段落</span>`;
-    searchEl.placeholder = "在我的收藏中搜尋…";
+    searchEl.placeholder = "在收藏中搜尋…";
     return;
   }
   if (activeTab === "tier") {
@@ -679,19 +679,43 @@ function renderTierSidebar() {
 
 // 排行榜：blade 名稱比對的時候，把 (BX)/(CX)/(復刻) 等標記跟空白都先剝掉
 function tierStripMarkers(s) {
-  return s.replace(/\s*\([^)]*\)\s*/g, "").replace(/\s*—.*$/, "").trim();
+  return s
+    .replace(/\s*\([^)]*\)\s*/g, "")
+    .replace(/\s*—.*$/, "")
+    .replace(/^輔助戰\s+/, "")
+    .trim();
 }
-// 把 blade 排行榜上的名字，盡力對到 ALL_BLADES 中的某個代號 (用來標示已擁有)
-function tierBladeOwnedMatch(name, ownedBlades) {
+
+// 排行榜戰刃名字 → 跳轉目標。回傳 {kind:"blade",id} 或 {kind:"product",id} 或 null
+function tierBladeMatch(name) {
   const stripped = tierStripMarkers(name);
-  const candidates = stripped.split(/\s*\/\s*/);
+  if (!stripped) return null;
+  const candidates = stripped.split(/\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+  if (!candidates.length) return null;
+  // 1. 完全相符的單片戰刃
   for (const cand of candidates) {
-    for (const code of ownedBlades) {
-      const dn = bladeName(code);
-      if (dn && (dn === cand || dn.includes(cand) || cand.includes(dn))) return true;
+    for (const code of ALL_BLADES) {
+      if (code.includes(".") || code.includes("/")) continue;
+      if (bladeName(code) === cand) return { kind: "blade", id: code };
     }
   }
-  return false;
+  // 2. 完全相符的 CX 組合戰刃 (跳到第一個含此組合的商品)
+  for (const cand of candidates) {
+    for (const v of VARIANTS) {
+      if (isEmptyPart(v.blade)) continue;
+      if (!v.blade.includes(".") && !v.blade.includes("/")) continue;
+      if (bladeName(v.blade) === cand) return { kind: "product", id: v.productId };
+    }
+  }
+  // 3. 模糊比對 (子字串) — 只用單片戰刃
+  for (const cand of candidates) {
+    for (const code of ALL_BLADES) {
+      if (code.includes(".") || code.includes("/")) continue;
+      const bn = bladeName(code);
+      if (bn && (bn.includes(cand) || cand.includes(bn))) return { kind: "blade", id: code };
+    }
+  }
+  return null;
 }
 
 function renderTier() {
@@ -709,14 +733,20 @@ function renderTier() {
     return `<div class="tier-row">
       <span class="tier-label tier-${label.replace(".", "-")}">${label}</span>
       <div class="tier-pills">${filtered.map(name => {
-        const owned = showOwned && tierBladeOwnedMatch(name, op.blades);
-        return `<span class="tier-pill ${owned ? "owned" : ""}">${name}</span>`;
+        const m = tierBladeMatch(name);
+        const owned = m && m.kind === "blade" && op.blades.has(m.id);
+        const cls = (showOwned && owned) ? "owned" : "";
+        if (m) {
+          const args = `'${m.kind}','${String(m.id).replace(/'/g, "\\'")}'`;
+          return `<span class="tier-pill ${cls}" onclick="tierJumpToBlade(${args})" title="點此跳到對應${m.kind === "product" ? "商品" : "戰刃"}">${name}</span>`;
+        }
+        return `<span class="tier-pill ${cls}">${name}</span>`;
       }).join("")}</div>
     </div>`;
   };
 
-  const renderPartRow = (label, codes, ownedSet, suffix) => {
-    const filtered = codes.filter(c => matchQuery(c) || matchQuery((c + (suffix || ""))));
+  const renderPartRow = (label, codes, ownedSet, kind) => {
+    const filtered = codes.filter(matchQuery);
     if (!filtered.length) return "";
     return `<div class="tier-row">
       <span class="tier-label tier-${label.replace(".", "-")}">${label}</span>
@@ -724,8 +754,7 @@ function renderTier() {
         const owned = ownedSet.has(code);
         const ghost = showOwned && !owned;
         const cls = (showOwned && owned) ? "owned" : (ghost ? "missing" : "");
-        const display = code + (suffix || "");
-        return `<span class="tier-pill ${cls}" onclick="tierJumpToPart('${code.replace(/'/g, "\\'")}', '${suffix ? "bit" : "ratchet"}')" title="點此跳到零件">${display}</span>`;
+        return `<span class="tier-pill ${cls}" onclick="tierJumpToPart('${code.replace(/'/g, "\\'")}', '${kind}')" title="點此跳到零件">${code}</span>`;
       }).join("")}</div>
     </div>`;
   };
@@ -734,21 +763,33 @@ function renderTier() {
     tierOrder.map(t => tier.blade && tier.blade[t] ? renderBladeRow(t, tier.blade[t]) : "").join("");
 
   const ratchetSection = `<h2 id="tier-ratchet" style="margin-top:24px;">⚙️ 固鎖 排行榜</h2>` +
-    tierOrder.map(t => tier.ratchet && tier.ratchet[t] ? renderPartRow(t, tier.ratchet[t], op.ratchets, "") : "").join("");
+    tierOrder.map(t => tier.ratchet && tier.ratchet[t] ? renderPartRow(t, tier.ratchet[t], op.ratchets, "ratchet") : "").join("");
 
   const bitSection = `<h2 id="tier-bit" style="margin-top:24px;">🔩 軸 排行榜</h2>` +
-    tierOrder.map(t => tier.bit && tier.bit[t] ? renderPartRow(t, tier.bit[t], op.bits, "軸") : "").join("");
+    tierOrder.map(t => tier.bit && tier.bit[t] ? renderPartRow(t, tier.bit[t], op.bits, "bit") : "").join("");
 
   return `<div>${bladeSection}${ratchetSection}${bitSection}</div>`;
 }
 
 function tierJumpToPart(code, kind) {
   if (!code) return;
-  // 確認該零件確實存在於 ALL_*，否則 select 會跑到不存在的細節頁
   const set = kind === "bit" ? ALL_BITS : ALL_RATCHETS;
   if (!set.has(code)) return;
   switchTab("parts");
   select(kind, code);
+}
+
+function tierJumpToBlade(kind, id) {
+  if (!id) return;
+  if (kind === "blade") {
+    if (!ALL_BLADES.has(id)) return;
+    switchTab("parts");
+    select("blade", id);
+  } else if (kind === "product") {
+    if (!PRODUCTS[id]) return;
+    switchTab("products");
+    select("product", id);
+  }
 }
 
 function renderProductList(q) {
