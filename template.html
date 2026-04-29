@@ -1545,6 +1545,10 @@ function openShare() {
     <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">
       把目前收藏摘要做成 PNG 圖片，方便存到相簿或分享。
     </div>
+    <div style="margin-bottom: 10px;">
+      <label style="display:block; color: var(--muted); font-size: 12px; margin-bottom: 4px;">標題（留空使用預設）</label>
+      <input type="text" id="share-title" placeholder="Beyblade X 收藏" oninput="_scheduleSharePreview()" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+    </div>
     <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer;">
       <input type="checkbox" id="share-include-code" onchange="updateSharePreview()">
       <span>包含匯入用短碼 (拍照即可給朋友匯入收藏)</span>
@@ -1561,18 +1565,25 @@ function openShare() {
   updateSharePreview();
 }
 
+let _shareDebounce = null;
+function _scheduleSharePreview() {
+  clearTimeout(_shareDebounce);
+  _shareDebounce = setTimeout(updateSharePreview, 250);
+}
+
 async function updateSharePreview() {
+  clearTimeout(_shareDebounce);
   const previewEl = document.getElementById("share-preview");
   if (!previewEl) return;
   previewEl.innerHTML = `<div style="padding:30px; color:var(--muted);">產生中…</div>`;
   _shareBlob = null;
   const includeCode = !!document.getElementById("share-include-code")?.checked;
+  const customTitle = (document.getElementById("share-title")?.value || "").trim();
   try {
-    const blob = await buildShareImageBlob(includeCode);
+    const blob = await buildShareImageBlob({ includeCode, customTitle });
     _shareBlob = blob;
     const url = URL.createObjectURL(blob);
     previewEl.innerHTML = `<img src="${url}" style="max-width:100%; height:auto; border-radius:6px;">`;
-    // 釋放 URL：圖片載入後就可以
     const img = previewEl.querySelector("img");
     img.onload = () => URL.revokeObjectURL(url);
   } catch (e) {
@@ -1605,7 +1616,9 @@ async function shareImageNow() {
 }
 
 // 直接畫到 canvas (避開 SVG foreignObject 在 Safari 的限制)
-async function buildShareImageBlob(includeCode) {
+async function buildShareImageBlob(opts) {
+  const { includeCode, customTitle } = opts || {};
+  const title = (customTitle && customTitle.trim()) || "Beyblade X 收藏";
   const op = ownedParts();
   const ownedProds = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id)));
   const ownedVarCount = Object.keys(state.owned).length;
@@ -1617,6 +1630,8 @@ async function buildShareImageBlob(includeCode) {
     (bySeries[s] = bySeries[s] || []).push(p);
   });
   const seriesKeys = Object.keys(bySeries).sort();
+  const ownedRatchets = [...op.ratchets].sort();
+  const ownedBits = [...op.bits].sort();
 
   let shortCode = "";
   if (includeCode) {
@@ -1687,6 +1702,16 @@ async function buildShareImageBlob(includeCode) {
       sections.push({ kind: "series", series: sk, layout, h: 22 + 10 + layout.totalH + 14 });
     }
   }
+  if (ownedRatchets.length) {
+    const layout = layoutPills(ownedRatchets, c => c, FONT_PILL);
+    sections.push({ kind: "section-h", text: `擁有固鎖 ${ownedRatchets.length}`, h: 32 + 14 });
+    sections.push({ kind: "pills", layout, h: layout.totalH + 14 });
+  }
+  if (ownedBits.length) {
+    const layout = layoutPills(ownedBits, c => c, FONT_PILL);
+    sections.push({ kind: "section-h", text: `擁有軸 ${ownedBits.length}`, h: 32 + 14 });
+    sections.push({ kind: "pills", layout, h: layout.totalH + 14 });
+  }
   let codeLines = null;
   if (shortCode) {
     codeLines = wrapMono(shortCode, FONT_CODE, INNER);
@@ -1730,7 +1755,16 @@ async function buildShareImageBlob(includeCode) {
   let y = PADTOP;
   for (const s of sections) {
     if (s.kind === "header") {
-      drawText("Beyblade X 收藏", PADX, y, FONT_TITLE, C.text, "top", "left");
+      // 標題太長就縮字級避免被日期擠到
+      const dateW = tw(dateStr, FONT_DATE);
+      const maxTitleW = INNER - dateW - 20;
+      let titleFont = FONT_TITLE;
+      let titleSize = 44;
+      while (tw(title, titleFont) > maxTitleW && titleSize > 22) {
+        titleSize -= 2;
+        titleFont = f(titleSize, 700);
+      }
+      drawText(title, PADX, y, titleFont, C.text, "top", "left");
       drawText(dateStr, W - PADX, y + 12, FONT_DATE, C.muted, "top", "right");
     } else if (s.kind === "stats") {
       const gap = 12;
@@ -1761,9 +1795,12 @@ async function buildShareImageBlob(includeCode) {
       drawText(s.text, PADX, y, FONT_SECTION, C.accent2, "top", "left");
     } else if (s.kind === "empty") {
       drawText(s.text, PADX, y, FONT_PILL, C.muted, "top", "left");
-    } else if (s.kind === "series") {
-      drawText(s.series, PADX, y, FONT_SERIES, C.muted, "top", "left");
-      let py = y + 22 + 10;
+    } else if (s.kind === "series" || s.kind === "pills") {
+      let py = y;
+      if (s.kind === "series") {
+        drawText(s.series, PADX, y, FONT_SERIES, C.muted, "top", "left");
+        py = y + 22 + 10;
+      }
       const gap = 8;
       for (const row of s.layout.rows) {
         let px = PADX;
@@ -1787,7 +1824,7 @@ async function buildShareImageBlob(includeCode) {
       ctx.moveTo(PADX, y + 0.5);
       ctx.lineTo(W - PADX, y + 0.5);
       ctx.stroke();
-      drawText("匯入用短碼 (拍照即可在 App 內貼上載入)", PADX, y + 22, FONT_LABEL, C.muted, "top", "left");
+      drawText("匯入用短碼", PADX, y + 22, FONT_LABEL, C.muted, "top", "left");
       let cy = y + 22 + 24 + 8;
       for (const line of s.lines) {
         drawText(line, PADX, cy, FONT_CODE, C.code, "top", "left");
