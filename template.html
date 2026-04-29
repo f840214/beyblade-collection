@@ -247,6 +247,7 @@
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
     <button onclick="openExport()">📤 匯出</button>
+    <button onclick="openShare()">🖼 分享</button>
     <button class="danger" onclick="clearAll()">清空</button>
   </div>
 </header>
@@ -543,6 +544,8 @@ function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   selected = null;
+  const searchEl = document.getElementById("search");
+  if (searchEl) searchEl.value = "";
   render();
 }
 
@@ -1529,6 +1532,171 @@ function clearAll() {
   state.owned = {};
   saveState();
   render();
+}
+
+// ============================================================
+// 分享 (匯出成圖片)
+// ============================================================
+let _shareBlob = null;
+
+function openShare() {
+  const canShare = !!(navigator.canShare && window.File);
+  showModal("分享收藏", `
+    <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">
+      把目前收藏摘要做成 PNG 圖片，方便存到相簿或分享。
+    </div>
+    <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer;">
+      <input type="checkbox" id="share-include-code" onchange="updateSharePreview()">
+      <span>包含匯入用短碼 (拍照即可給朋友匯入收藏)</span>
+    </label>
+    <div id="share-preview" style="background:#0f1115; border:1px solid var(--border); border-radius:8px; padding:8px; min-height:140px; max-height:50vh; overflow:auto; text-align:center; color:var(--muted);">
+      產生中…
+    </div>
+  `, [
+    { label: "💾 下載", primary: true, action: downloadShareImage },
+    ...(canShare ? [{ label: "🔗 分享…", action: shareImageNow }] : []),
+    { label: "關閉", action: closeModal },
+  ]);
+  _shareBlob = null;
+  updateSharePreview();
+}
+
+async function updateSharePreview() {
+  const previewEl = document.getElementById("share-preview");
+  if (!previewEl) return;
+  previewEl.innerHTML = `<div style="padding:30px; color:var(--muted);">產生中…</div>`;
+  _shareBlob = null;
+  const includeCode = !!document.getElementById("share-include-code")?.checked;
+  try {
+    const blob = await buildShareImageBlob(includeCode);
+    _shareBlob = blob;
+    const url = URL.createObjectURL(blob);
+    previewEl.innerHTML = `<img src="${url}" style="max-width:100%; height:auto; border-radius:6px;">`;
+    // 釋放 URL：圖片載入後就可以
+    const img = previewEl.querySelector("img");
+    img.onload = () => URL.revokeObjectURL(url);
+  } catch (e) {
+    previewEl.innerHTML = `<div style="padding:30px; color:var(--missing);">產生失敗：${e.message}</div>`;
+  }
+}
+
+function downloadShareImage() {
+  if (!_shareBlob) { alert("圖片尚未產生"); return; }
+  const url = URL.createObjectURL(_shareBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.png`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function shareImageNow() {
+  if (!_shareBlob) { alert("圖片尚未產生"); return; }
+  const file = new File([_shareBlob], `beyx-collection-${new Date().toISOString().slice(0,10)}.png`, { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Beyblade X 收藏" });
+    } catch (e) {
+      if (e.name !== "AbortError") alert("分享失敗：" + e.message);
+    }
+  } else {
+    downloadShareImage();
+  }
+}
+
+// 用 SVG foreignObject 把 HTML 渲染成 PNG。
+async function buildShareImageBlob(includeCode) {
+  const op = ownedParts();
+  const ownedProds = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id)));
+  const ownedVarCount = Object.keys(state.owned).length;
+
+  const bySeries = {};
+  ownedProds.forEach(p => {
+    const s = productSeries(p.id);
+    (bySeries[s] = bySeries[s] || []).push(p);
+  });
+
+  let shortCode = "";
+  if (includeCode) {
+    shortCode = await compressToShortCode(JSON.stringify({
+      schema: "beyx_collection", version: 1,
+      owned: state.owned, builds: state.builds || [],
+    }));
+  }
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const stats = [
+    ["陀螺戰士", ownedVarCount, VARIANTS.length],
+    ["戰刃", op.blades.size, ALL_BLADES.size],
+    ["固鎖", op.ratchets.size, ALL_RATCHETS.size],
+    ["軸", op.bits.size, ALL_BITS.size],
+  ];
+  const esc = s => String(s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+  const inner = `
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:30px;">
+      <div style="font-size:44px; font-weight:700;">⚔️ Beyblade X 收藏</div>
+      <div style="color:#8a93a3; font-size:18px;">${esc(dateStr)}</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:32px;">
+      ${stats.map(([label, n, t]) => `
+        <div style="background:#1f232c; border-radius:10px; padding:18px; text-align:center;">
+          <div style="color:#8a93a3; font-size:16px; margin-bottom:6px;">${esc(label)}</div>
+          <div><span style="font-size:34px; font-weight:700; color:#2ecc71;">${n}</span><span style="font-size:18px; color:#8a93a3;"> / ${t}</span></div>
+        </div>
+      `).join("")}
+    </div>
+    <div style="margin-bottom:14px; font-size:24px; font-weight:600; color:#7cf;">擁有商品 ${ownedProds.length}</div>
+    ${ownedProds.length === 0 ? `<div style="color:#8a93a3; padding:20px 0;">還沒有任何擁有紀錄</div>` :
+      Object.keys(bySeries).sort().map(s => `
+        <div style="margin-bottom:14px;">
+          <div style="color:#8a93a3; font-size:15px; margin-bottom:6px;">${esc(s)}</div>
+          <div>${bySeries[s].map(p => `<span style="display:inline-block; background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; padding:4px 10px; border-radius:12px; font-size:16px; font-family:ui-monospace,monospace; margin:0 6px 6px 0;">${esc(p.id)}</span>`).join("")}</div>
+        </div>
+      `).join("")
+    }
+    ${shortCode ? `
+      <div style="margin-top:30px; padding-top:20px; border-top:1px solid #2a2f3a;">
+        <div style="color:#8a93a3; font-size:14px; margin-bottom:8px;">📦 匯入用短碼</div>
+        <div style="font-family:ui-monospace,monospace; font-size:11px; word-break:break-all; line-height:1.4; color:#c0c4cd;">${esc(shortCode)}</div>
+      </div>
+    ` : ""}
+  `;
+
+  const wrapStyle = `width:1080px; padding:50px 60px; box-sizing:border-box; background:#0f1115; color:#e6e9ef; font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif; font-size:18px; line-height:1.5;`;
+
+  // 量高度
+  const measure = document.createElement("div");
+  measure.style.cssText = "position:absolute; left:-99999px; top:0;";
+  measure.innerHTML = `<div style="${wrapStyle}">${inner}</div>`;
+  document.body.appendChild(measure);
+  const height = measure.firstElementChild.offsetHeight;
+  document.body.removeChild(measure);
+
+  // 透過 XMLSerializer 確保 XHTML 合法
+  const host = document.createElement("div");
+  host.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" style="${wrapStyle}">${inner}</div>`;
+  const xhtml = new XMLSerializer().serializeToString(host.firstElementChild);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
+  const dataUrl = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+
+  const img = new Image();
+  await new Promise((res, rej) => {
+    img.onload = res;
+    img.onerror = () => rej(new Error("SVG 渲染失敗 (此瀏覽器可能不支援 foreignObject 轉 PNG)"));
+    img.src = dataUrl;
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+
+  return new Promise((res, rej) => {
+    canvas.toBlob(b => b ? res(b) : rej(new Error("canvas.toBlob 失敗")), "image/png");
+  });
 }
 
 // ============================================================
