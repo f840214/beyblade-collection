@@ -242,7 +242,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.39</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.40</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -1604,17 +1604,19 @@ async function shareImageNow() {
   }
 }
 
-// 用 SVG foreignObject 把 HTML 渲染成 PNG。
+// 直接畫到 canvas (避開 SVG foreignObject 在 Safari 的限制)
 async function buildShareImageBlob(includeCode) {
   const op = ownedParts();
   const ownedProds = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id)));
   const ownedVarCount = Object.keys(state.owned).length;
+  const dateStr = new Date().toISOString().slice(0, 10);
 
   const bySeries = {};
   ownedProds.forEach(p => {
     const s = productSeries(p.id);
     (bySeries[s] = bySeries[s] || []).push(p);
   });
+  const seriesKeys = Object.keys(bySeries).sort();
 
   let shortCode = "";
   if (includeCode) {
@@ -1624,75 +1626,178 @@ async function buildShareImageBlob(includeCode) {
     }));
   }
 
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const stats = [
-    ["陀螺戰士", ownedVarCount, VARIANTS.length],
-    ["戰刃", op.blades.size, ALL_BLADES.size],
-    ["固鎖", op.ratchets.size, ALL_RATCHETS.size],
-    ["軸", op.bits.size, ALL_BITS.size],
-  ];
-  const esc = s => String(s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+  const W = 1080;
+  const PADX = 60, PADTOP = 50, PADBOT = 50;
+  const INNER = W - PADX * 2;
+  const FFAM = `-apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif`;
+  const f = (sz, w) => `${w ? w + " " : ""}${sz}px ${FFAM}`;
+  const FONT_TITLE   = f(44, 700);
+  const FONT_DATE    = f(20);
+  const FONT_LABEL   = f(16);
+  const FONT_NUM     = f(34, 700);
+  const FONT_TOT     = f(18);
+  const FONT_SECTION = f(24, 600);
+  const FONT_SERIES  = f(15);
+  const FONT_PILL    = f(16);
+  const FONT_FOOTER  = f(13);
+  const FONT_CODE    = `13px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  const C = {
+    bg: "#0f1115", panel: "#1f232c", text: "#e6e9ef", muted: "#8a93a3",
+    accent2: "#7cf", owned: "#2ecc71", border: "#2a2f3a", code: "#c0c4cd",
+  };
 
-  const inner = `
-    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:30px;">
-      <div style="font-size:44px; font-weight:700;">⚔️ Beyblade X 收藏</div>
-      <div style="color:#8a93a3; font-size:18px;">${esc(dateStr)}</div>
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:32px;">
-      ${stats.map(([label, n, t]) => `
-        <div style="background:#1f232c; border-radius:10px; padding:18px; text-align:center;">
-          <div style="color:#8a93a3; font-size:16px; margin-bottom:6px;">${esc(label)}</div>
-          <div><span style="font-size:34px; font-weight:700; color:#2ecc71;">${n}</span><span style="font-size:18px; color:#8a93a3;"> / ${t}</span></div>
-        </div>
-      `).join("")}
-    </div>
-    <div style="margin-bottom:14px; font-size:24px; font-weight:600; color:#7cf;">擁有商品 ${ownedProds.length}</div>
-    ${ownedProds.length === 0 ? `<div style="color:#8a93a3; padding:20px 0;">還沒有任何擁有紀錄</div>` :
-      Object.keys(bySeries).sort().map(s => `
-        <div style="margin-bottom:14px;">
-          <div style="color:#8a93a3; font-size:15px; margin-bottom:6px;">${esc(s)}</div>
-          <div>${bySeries[s].map(p => `<span style="display:inline-block; background:rgba(46,204,113,0.15); border:1px solid #2ecc71; color:#2ecc71; padding:4px 10px; border-radius:12px; font-size:16px; font-family:ui-monospace,monospace; margin:0 6px 6px 0;">${esc(p.id)}</span>`).join("")}</div>
-        </div>
-      `).join("")
+  // 用 dummy ctx 量字寬
+  const mctx = document.createElement("canvas").getContext("2d");
+  function tw(text, font) { mctx.font = font; return mctx.measureText(text).width; }
+
+  function layoutPills(items, getText, font, padX = 14, height = 32, gap = 8, maxWidth = INNER) {
+    const rows = [[]];
+    let curW = 0;
+    for (const it of items) {
+      const w = tw(getText(it), font) + padX * 2;
+      if (curW > 0 && curW + gap + w > maxWidth) { rows.push([]); curW = 0; }
+      rows[rows.length - 1].push({ item: it, w, h: height, label: getText(it) });
+      curW += (curW > 0 ? gap : 0) + w;
     }
-    ${shortCode ? `
-      <div style="margin-top:30px; padding-top:20px; border-top:1px solid #2a2f3a;">
-        <div style="color:#8a93a3; font-size:14px; margin-bottom:8px;">📦 匯入用短碼</div>
-        <div style="font-family:ui-monospace,monospace; font-size:11px; word-break:break-all; line-height:1.4; color:#c0c4cd;">${esc(shortCode)}</div>
-      </div>
-    ` : ""}
-  `;
+    return { rows, totalH: rows.length * height + (rows.length - 1) * gap };
+  }
 
-  const wrapStyle = `width:1080px; padding:50px 60px; box-sizing:border-box; background:#0f1115; color:#e6e9ef; font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif; font-size:18px; line-height:1.5;`;
+  function wrapMono(text, font, maxWidth) {
+    const lines = [];
+    let cur = "";
+    for (const ch of text) {
+      const test = cur + ch;
+      if (tw(test, font) > maxWidth) { lines.push(cur); cur = ch; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
 
   // 量高度
-  const measure = document.createElement("div");
-  measure.style.cssText = "position:absolute; left:-99999px; top:0;";
-  measure.innerHTML = `<div style="${wrapStyle}">${inner}</div>`;
-  document.body.appendChild(measure);
-  const height = measure.firstElementChild.offsetHeight;
-  document.body.removeChild(measure);
+  const sections = [];
+  sections.push({ kind: "header", h: 56 + 30 });
+  sections.push({ kind: "stats", h: 96 + 32 });
+  sections.push({ kind: "section-h", text: `擁有商品 ${ownedProds.length}`, h: 32 + 14 });
+  if (ownedProds.length === 0) {
+    sections.push({ kind: "empty", text: "還沒有任何擁有紀錄", h: 32 });
+  } else {
+    for (const sk of seriesKeys) {
+      const layout = layoutPills(bySeries[sk], p => p.id, FONT_PILL);
+      sections.push({ kind: "series", series: sk, layout, h: 22 + 10 + layout.totalH + 14 });
+    }
+  }
+  let codeLines = null;
+  if (shortCode) {
+    codeLines = wrapMono(shortCode, FONT_CODE, INNER);
+    const h = 24 + 24 + 8 + codeLines.length * 18 + 8;
+    sections.push({ kind: "code", lines: codeLines, h });
+  }
+  sections.push({ kind: "footer", h: 24 });
 
-  // 透過 XMLSerializer 確保 XHTML 合法
-  const host = document.createElement("div");
-  host.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" style="${wrapStyle}">${inner}</div>`;
-  const xhtml = new XMLSerializer().serializeToString(host.firstElementChild);
+  const contentH = sections.reduce((a, s) => a + s.h, 0);
+  const H = PADTOP + contentH + PADBOT;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="${height}"><foreignObject width="100%" height="100%">${xhtml}</foreignObject></svg>`;
-  const dataUrl = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-
-  const img = new Image();
-  await new Promise((res, rej) => {
-    img.onload = res;
-    img.onerror = () => rej(new Error("SVG 渲染失敗 (此瀏覽器可能不支援 foreignObject 轉 PNG)"));
-    img.src = dataUrl;
-  });
-
+  // 畫
   const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = height;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0);
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  function drawText(text, x, y, font, color, baseline = "top", align = "left") {
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textBaseline = baseline;
+    ctx.textAlign = align;
+    ctx.fillText(text, x, y);
+  }
+  function roundRectPath(x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  let y = PADTOP;
+  for (const s of sections) {
+    if (s.kind === "header") {
+      drawText("Beyblade X 收藏", PADX, y, FONT_TITLE, C.text, "top", "left");
+      drawText(dateStr, W - PADX, y + 12, FONT_DATE, C.muted, "top", "right");
+    } else if (s.kind === "stats") {
+      const gap = 12;
+      const boxW = (INNER - gap * 3) / 4;
+      const boxH = 96;
+      const stats = [
+        ["陀螺戰士", ownedVarCount, VARIANTS.length],
+        ["戰刃", op.blades.size, ALL_BLADES.size],
+        ["固鎖", op.ratchets.size, ALL_RATCHETS.size],
+        ["軸", op.bits.size, ALL_BITS.size],
+      ];
+      stats.forEach(([label, n, t], i) => {
+        const x = PADX + i * (boxW + gap);
+        ctx.fillStyle = C.panel;
+        roundRectPath(x, y, boxW, boxH, 12);
+        ctx.fill();
+        drawText(label, x + boxW / 2, y + 22, FONT_LABEL, C.muted, "top", "center");
+        const numStr = String(n);
+        const totStr = " / " + t;
+        const numW = tw(numStr, FONT_NUM);
+        const totW = tw(totStr, FONT_TOT);
+        const totalW = numW + totW;
+        const sx = x + (boxW - totalW) / 2;
+        drawText(numStr, sx, y + 50, FONT_NUM, C.owned, "top", "left");
+        drawText(totStr, sx + numW, y + 64, FONT_TOT, C.muted, "top", "left");
+      });
+    } else if (s.kind === "section-h") {
+      drawText(s.text, PADX, y, FONT_SECTION, C.accent2, "top", "left");
+    } else if (s.kind === "empty") {
+      drawText(s.text, PADX, y, FONT_PILL, C.muted, "top", "left");
+    } else if (s.kind === "series") {
+      drawText(s.series, PADX, y, FONT_SERIES, C.muted, "top", "left");
+      let py = y + 22 + 10;
+      const gap = 8;
+      for (const row of s.layout.rows) {
+        let px = PADX;
+        for (const pill of row) {
+          ctx.fillStyle = "rgba(46,204,113,0.15)";
+          roundRectPath(px, py, pill.w, pill.h, pill.h / 2);
+          ctx.fill();
+          ctx.strokeStyle = C.owned;
+          ctx.lineWidth = 1;
+          roundRectPath(px + 0.5, py + 0.5, pill.w - 1, pill.h - 1, (pill.h - 1) / 2);
+          ctx.stroke();
+          drawText(pill.label, px + pill.w / 2, py + pill.h / 2 + 1, FONT_PILL, C.owned, "middle", "center");
+          px += pill.w + gap;
+        }
+        py += 32 + gap;
+      }
+    } else if (s.kind === "code") {
+      ctx.strokeStyle = C.border;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PADX, y + 0.5);
+      ctx.lineTo(W - PADX, y + 0.5);
+      ctx.stroke();
+      drawText("匯入用短碼 (拍照即可在 App 內貼上載入)", PADX, y + 22, FONT_LABEL, C.muted, "top", "left");
+      let cy = y + 22 + 24 + 8;
+      for (const line of s.lines) {
+        drawText(line, PADX, cy, FONT_CODE, C.code, "top", "left");
+        cy += 18;
+      }
+    } else if (s.kind === "footer") {
+      drawText("beyblade-collection", W / 2, y + 4, FONT_FOOTER, C.muted, "top", "center");
+    }
+    y += s.h;
+  }
 
   return new Promise((res, rej) => {
     canvas.toBlob(b => b ? res(b) : rej(new Error("canvas.toBlob 失敗")), "image/png");
