@@ -555,7 +555,7 @@ function buildFilters() {
     return;
   }
   if (activeTab === "tier") {
-    wrap.innerHTML = `<label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; render()"> 標示已擁有的零件</label>`;
+    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">點左側類別跳到對應段落</span>`;
     searchEl.placeholder = "在排行榜中搜尋…";
     return;
   }
@@ -836,6 +836,12 @@ function renderTier() {
     </div>`;
   };
 
+  const toggle = `<div style="display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;">
+    <button class="${showOwned ? 'primary' : ''}" onclick="filterOpts.ownedOnly = !filterOpts.ownedOnly; render();">
+      ${showOwned ? '✓ ' : ''}標示已擁有
+    </button>
+  </div>`;
+
   const bladeSection = `<h2 id="tier-blade" style="margin-top:0;">⚔️ 戰刃 排行榜</h2>` +
     tierOrder.map(t => tier.blade && tier.blade[t] ? renderBladeRow(t, tier.blade[t]) : "").join("");
 
@@ -845,7 +851,7 @@ function renderTier() {
   const bitSection = `<h2 id="tier-bit" style="margin-top:24px;">🔩 軸 排行榜</h2>` +
     tierOrder.map(t => tier.bit && tier.bit[t] ? renderPartRow(t, tier.bit[t], op.bits, "bit") : "").join("");
 
-  return `<div>${bladeSection}${ratchetSection}${bitSection}</div>`;
+  return `<div>${toggle}${bladeSection}${ratchetSection}${bitSection}</div>`;
 }
 
 function tierJumpToPart(code, kind) {
