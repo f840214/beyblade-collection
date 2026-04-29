@@ -242,7 +242,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.41</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.42</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -377,9 +377,10 @@ function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
-// CX 還會用 "/./.X" 形式 — 只要拆掉 "/" 和 "." 後沒剩任何字元就是空
+// CX 還會用 "/./.X" 形式; 固鎖也用 "=" 表示「沒有固鎖」(例如 "Em.Mg.H = Op")
+// 拆掉這些占位符後沒剩任何字元就是空
 function isEmptyPart(code) {
-  return !code || !code.replace(/[\/\.]/g, "").length;
+  return !code || !code.replace(/[\/\.=]/g, "").length;
 }
 
 // 商品種類代號 → 中文。第二段 H 表示異色版／再推出。

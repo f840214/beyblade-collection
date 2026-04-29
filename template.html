@@ -377,9 +377,10 @@ function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
-// CX 還會用 "/./.X" 形式 — 只要拆掉 "/" 和 "." 後沒剩任何字元就是空
+// CX 還會用 "/./.X" 形式; 固鎖也用 "=" 表示「沒有固鎖」(例如 "Em.Mg.H = Op")
+// 拆掉這些占位符後沒剩任何字元就是空
 function isEmptyPart(code) {
-  return !code || !code.replace(/[\/\.]/g, "").length;
+  return !code || !code.replace(/[\/\.=]/g, "").length;
 }
 
 // 商品種類代號 → 中文。第二段 H 表示異色版／再推出。
