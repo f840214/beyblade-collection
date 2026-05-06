@@ -1030,6 +1030,8 @@ function escapeAttr(s) { return s.replace(/'/g, "\\'"); }
 function select(type, id) {
   selected = { type, id };
   render();
+  const m = document.querySelector(".main");
+  if (m) m.scrollTop = 0;
 }
 
 function renderDetail() {
