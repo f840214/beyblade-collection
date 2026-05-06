@@ -120,6 +120,12 @@
   .card .row .v { color: var(--text); }
   .desc { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
 
+  .bit-img-wrap {
+    background: #000; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 12px; padding: 8px; display: flex; justify-content: center;
+  }
+  .bit-img { max-height: 220px; width: auto; object-fit: contain; }
+
   .variants {
     display: grid; gap: 6px;
   }
@@ -242,7 +248,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-04-29">v0.42</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-06">v0.44</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -375,6 +381,12 @@ function bladeInfo(code) {
 }
 function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
+
+// 軸圖檔名對照: 部分檔名與資料代號不一致 (全形/大小寫/全名)
+const BIT_IMG_FILENAME = { N: "Ｎ", Op: "OP", Tr: "Turbo" };
+function bitImageSrc(code) {
+  return `bits/${encodeURIComponent(BIT_IMG_FILENAME[code] || code)}.png`;
+}
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
 // CX 還會用 "/./.X" 形式; 固鎖也用 "=" 表示「沒有固鎖」(例如 "Em.Mg.H = Op")
@@ -1353,6 +1365,11 @@ function renderPartDetail(type, code) {
     </h2>
     <div class="sub" style="font-family:monospace;">${code}</div>
     <div class="sub">${type === "blade" ? "戰刃 Blade" : type === "ratchet" ? "固鎖 Ratchet" : "軸 Bit"}</div>
+
+    ${type === "bit" ? `<div class="bit-img-wrap">
+      <img class="bit-img" src="${bitImageSrc(code)}" alt="${code}"
+           onerror="this.parentElement.style.display='none'">
+    </div>` : ""}
 
     <div class="card">
       <h3>零件資訊</h3>
