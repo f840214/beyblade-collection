@@ -145,14 +145,10 @@
   }
 
   .prod-img-wrap {
-    margin-bottom: 12px; display: flex; justify-content: center;
-    background: var(--panel2); border-radius: 8px; padding: 6px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 12px; padding: 12px; display: flex; justify-content: center;
   }
-  /* 圖本身是白底 PNG, 用 multiply 把白色融進深色面板, 保留陀螺主體 */
-  .prod-img {
-    max-height: 260px; width: auto; object-fit: contain;
-    mix-blend-mode: multiply; filter: brightness(1.15);
-  }
+  .prod-img { max-height: 280px; width: auto; object-fit: contain; }
 
   .news-date-section { margin-bottom: 18px; }
   .news-date-head {
@@ -307,7 +303,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.50</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.51</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -472,9 +468,10 @@ function cxBladeSegments(code) {
   });
 }
 
-// 商品圖片來源: Takara Tomy 官網 (e.g. UX-15 → UX15@1.png); BXH/BXA/BXC 沒對應圖
+// 商品圖片來源: 本地預處理的透明 PNG (rembg 從 Takara Tomy 官圖去背)
+// 只涵蓋 BX/BXG/CX/UX; BXH/BXA/BXC 沒對應圖會 onerror 隱藏
 function productImageSrc(pid) {
-  return `https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/${pid.replace(/-/g, "")}@1.png`;
+  return `products/${pid.replace(/-/g, "")}@1.png`;
 }
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
