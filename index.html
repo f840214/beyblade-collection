@@ -109,7 +109,7 @@
   .item.owned .check.toggleable:hover { background: rgba(46,204,113,0.25); }
   .item-thumb {
     width: 28px; height: 28px; object-fit: contain;
-    background: #000; border-radius: 4px; flex-shrink: 0;
+    background: var(--panel2); border-radius: 4px; flex-shrink: 0;
   }
 
   .detail h2 { margin: 0 0 4px; font-size: 18px; }
@@ -125,10 +125,61 @@
   .desc { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.5; }
 
   .bit-img-wrap {
-    background: #000; border: 1px solid var(--border); border-radius: 8px;
-    margin-bottom: 12px; padding: 8px; display: flex; justify-content: center;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 12px; padding: 12px; display: flex; justify-content: center;
   }
   .bit-img { max-height: 220px; width: auto; object-fit: contain; }
+
+  .cx-piece {
+    margin: 0; display: flex; flex-direction: column; align-items: center;
+    background: rgba(255,255,255,0.04); border-radius: 6px; padding: 6px;
+    min-width: 90px;
+  }
+  .cx-piece img { max-height: 120px; width: auto; object-fit: contain; }
+  .cx-piece figcaption {
+    font-size: 11px; color: var(--text); margin-top: 4px; text-align: center;
+  }
+  .cx-piece .cx-cat {
+    display: block; color: var(--muted); font-size: 10px;
+    font-family: monospace; text-transform: lowercase;
+  }
+
+  .prod-img-wrap {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 12px; padding: 12px; display: flex; justify-content: center;
+  }
+  .prod-img { max-height: 320px; width: auto; object-fit: contain; }
+
+  .news-date-section { margin-bottom: 18px; }
+  .news-date-head {
+    margin: 4px 0 10px; font-size: 14px; color: var(--accent);
+    border-bottom: 1px solid var(--border); padding-bottom: 4px;
+  }
+  .news-card { border-color: rgba(78,161,255,0.25); }
+  .news-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .news-code {
+    font-family: monospace; font-size: 12px; color: var(--muted);
+    padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px;
+  }
+  .news-title { margin: 2px 0 6px; font-size: 15px; color: var(--text); }
+  .news-imgs {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;
+  }
+  .news-imgs img {
+    max-height: 180px; max-width: 100%;
+    background: #fff; border: 1px solid var(--border); border-radius: 6px;
+    object-fit: contain;
+  }
+  .news-desc { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+  .news-desc li { margin-bottom: 2px; color: var(--text); }
+
+  .exps-tabs {
+    display: flex; gap: 6px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--border); padding-bottom: 8px;
+  }
 
   .variants {
     display: grid; gap: 6px;
@@ -252,12 +303,12 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.48</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.49</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
-    <button onclick="openExport()">📤 匯出</button>
-    <button onclick="openShare()">🖼 分享</button>
+    <button onclick="switchTab('news')">📰 情報</button>
+    <button onclick="openExportShare()">📤 匯出 / 分享</button>
     <button class="danger" onclick="clearAll()">清空</button>
   </div>
 </header>
@@ -364,17 +415,26 @@ function findCxSegmentAt(seg, pos, total) {
   }
   return null;
 }
-// 組合中文: 把有翻譯的段直接接起來 (e.g. Bh.Bl.B.K → 龍王閃擊)
-// 沒有任何段有中文就回退到原始代號
+// 組合中文: 有 chi 翻譯的段直接接起來 (e.g. Bh.Bl.B.K → 龍王閃擊)
+// 沒 chi 的段 (e.g. CX assist W/M) 用代號補上, 讓 Cr.Fl.W 跟 Wh.Fl.M 可區分
+// 中文段之間直接相連; 中英混雜處用「·」分隔避免讀成一串
 function cxComposeChi(code) {
   const segs = code.split(".").map(s => s.trim());
-  const named = segs.map((s, i) => {
-    if (!s || s === "/") return null;
+  let out = "";
+  let lastIsChi = false;
+  let any = false;
+  segs.forEach((s, i) => {
+    if (!s || s === "/") return;
     const f = findCxSegmentAt(s, i, segs.length);
-    if (!f) return null;
-    return preferredChi(f.names && f.names.chi) || null;
-  }).filter(Boolean);
-  return named.length ? named.join("") : code;
+    const chi = f ? preferredChi(f.names && f.names.chi) : "";
+    const token = chi || s;
+    const isChi = !!chi;
+    if (out && !(lastIsChi && isChi)) out += "·";
+    out += token;
+    lastIsChi = isChi;
+    any = true;
+  });
+  return any ? out : code;
 }
 function bladeInfo(code) {
   if (code.includes(".") || code.includes("/")) {
@@ -386,10 +446,31 @@ function bladeInfo(code) {
 function ratchetInfo(code) { return DB.ratchet[code] || { desc: "(未知)" }; }
 function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; }
 
-// 軸圖檔名對照: 部分檔名與資料代號不一致 (全形/大小寫/全名)
-const BIT_IMG_FILENAME = { N: "Ｎ", Op: "OP", Tr: "Turbo" };
 function bitImageSrc(code) {
-  return `bits/${encodeURIComponent(BIT_IMG_FILENAME[code] || code)}.png`;
+  return `bits/${encodeURIComponent(code)}.png`;
+}
+
+// 戰刃圖片來源
+// 單體戰刃: blades/{abbr}.png
+// CX 組合刃: 拆段 → 各段 blades/CX/{cat}/{abbr}.png (cat 由位置決定)
+function bladeImageSrc(code) {
+  if (!code || code.includes("/") || code.includes(".")) return null;
+  return `blades/${encodeURIComponent(code)}.png`;
+}
+function cxBladeSegments(code) {
+  if (!code || !code.includes(".")) return [];
+  const segs = code.split(".").map(s => s.trim());
+  return segs.map((s, i) => {
+    if (!s || s === "/") return null;
+    const f = findCxSegmentAt(s, i, segs.length);
+    if (!f) return null;
+    return { abbr: s, cat: f._category, src: `blades/CX/${f._category}/${encodeURIComponent(s)}.png`, names: f.names };
+  });
+}
+
+// 商品圖片來源: Takara Tomy 官網 (e.g. UX-15 → UX15@1.png); BXH/BXA/BXC 沒對應圖
+function productImageSrc(pid) {
+  return `https://beyblade.takaratomy.co.jp/beyblade-x/lineup/_image/${pid.replace(/-/g, "")}@1.png`;
 }
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
@@ -549,6 +630,35 @@ let filterOpts = {
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
 let mineView = "detail"; // detail | table
 
+// 情報: 從上游 fetch 的 -update.json，cache 在 localStorage
+const NEWS_URL = "https://go-shoot.github.io/x/db/-update.json";
+const NEWS_CACHE_KEY = "beyx-news-cache";
+const NEWS_TTL_MS = 60 * 60 * 1000; // 1 小時
+let newsState = { status: "idle", data: null, error: null, fetchedAt: 0 };
+function loadNewsCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || "null");
+    if (c && c.data && c.fetchedAt) { newsState = { status: "ok", data: c.data, error: null, fetchedAt: c.fetchedAt }; }
+  } catch (e) {}
+}
+async function fetchNews(force = false) {
+  if (!force && newsState.status === "ok" && Date.now() - newsState.fetchedAt < NEWS_TTL_MS) return;
+  newsState.status = "loading";
+  if (activeTab === "news") render();
+  try {
+    const resp = await fetch(NEWS_URL, { cache: "no-cache" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    newsState = { status: "ok", data, error: null, fetchedAt: Date.now() };
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ data, fetchedAt: newsState.fetchedAt }));
+  } catch (e) {
+    newsState.status = newsState.data ? "ok" : "error";
+    newsState.error = String(e);
+  }
+  if (activeTab === "news") render();
+}
+loadNewsCache();
+
 function toggleGroup(key) {
   if (collapsedGroups.has(key)) collapsedGroups.delete(key);
   else collapsedGroups.add(key);
@@ -564,6 +674,7 @@ function switchTab(tab) {
   const searchEl = document.getElementById("search");
   if (searchEl) searchEl.value = "";
   render();
+  if (tab === "news") fetchNews();
 }
 
 function buildFilters() {
@@ -577,6 +688,13 @@ function buildFilters() {
   if (activeTab === "tier") {
     wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">點左側類別跳到對應段落</span>`;
     searchEl.placeholder = "在排行榜中搜尋…";
+    return;
+  }
+  if (activeTab === "news") {
+    const updated = newsState.fetchedAt ? new Date(newsState.fetchedAt).toLocaleString() : "—";
+    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">資料來自 go-shoot.github.io ・ 上次更新 ${updated}</span>
+      <button onclick="fetchNews(true)" style="margin-left:auto;">↻ 重新整理</button>`;
+    searchEl.placeholder = "搜尋情報…";
     return;
   }
   if (activeTab === "builds") {
@@ -607,7 +725,7 @@ function render() {
   renderList();
   renderDetail();
   // 手機版：當在「我的收藏」分頁，或 products/parts/builds 已選中項目時，顯示 detail 全螢幕
-  const showMain = activeTab === "mine" || activeTab === "tier" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
+  const showMain = activeTab === "mine" || activeTab === "tier" || activeTab === "news" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
   document.body.classList.toggle("show-detail", showMain);
 }
 
@@ -633,6 +751,8 @@ function renderList() {
     listEl.innerHTML = renderMineSidebar();
   } else if (activeTab === "tier") {
     listEl.innerHTML = renderTierSidebar();
+  } else if (activeTab === "news") {
+    listEl.innerHTML = renderNewsSidebar(q);
   } else {
     listEl.innerHTML = renderBuildsList(q);
   }
@@ -1018,9 +1138,19 @@ function renderPartList(q) {
           const display = cn
             ? `${cn} <span style='color:var(--muted); font-family:monospace; font-size:11px;'>${code}</span>`
             : `<span style='font-family:monospace;'>${code}</span>`;
-          const thumb = sec.key === "bit"
-            ? `<img class="item-thumb" src="${bitImageSrc(code)}" loading="lazy" onerror="this.style.visibility='hidden'">`
-            : "";
+          let thumb = "";
+          if (sec.key === "bit") {
+            thumb = `<img class="item-thumb" src="${bitImageSrc(code)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+          } else if (sec.key === "blade") {
+            const single = bladeImageSrc(code);
+            if (single) {
+              thumb = `<img class="item-thumb" src="${single}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+            } else {
+              const segs = cxBladeSegments(code).filter(Boolean);
+              const chip = segs.find(s => s.cat === "chip") || segs[0];
+              if (chip) thumb = `<img class="item-thumb" src="${chip.src}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+            }
+          }
           return `<div class="item ${cls}" onclick="select('${sec.key}','${escapeAttr(code)}')">
             <span class="check">${isO ? "●" : "○"}</span>
             ${thumb}
@@ -1047,6 +1177,7 @@ function renderDetail() {
   const back = `<div class="mobile-back-bar"><button onclick="goBack()">← 返回</button></div>`;
   if (activeTab === "mine") { el.innerHTML = back + renderCollection(); return; }
   if (activeTab === "tier") { el.innerHTML = back + renderTier(); return; }
+  if (activeTab === "news") { el.innerHTML = back + renderNews(); return; }
   if (activeTab === "builds") {
     if (!selected) { el.innerHTML = back + `<div class="empty">← 從左側選配置，或按「+ 新增配置」</div>`; return; }
     el.innerHTML = back + renderBuildEditor(selected.id);
@@ -1173,8 +1304,115 @@ function pickPart(code) {
 function goBack() {
   if (activeTab === "mine") { switchTab("products"); return; }
   if (activeTab === "tier") { switchTab("products"); return; }
+  if (activeTab === "news") { switchTab("products"); return; }
   selected = null;
   render();
+}
+
+// ============================================================
+// 情報 (news)
+// ============================================================
+function newsFiles(d) {
+  // 從 -update.json 過濾出檔案時間戳 (排除 news)
+  return Object.entries(d || {}).filter(([k]) => k !== "news");
+}
+function newsItems(d) {
+  // 把 news 攤平成 [{date, item}, ...]; 新到舊
+  const news = (d && d.news) || {};
+  const arr = [];
+  Object.keys(news).sort().reverse().forEach(date => {
+    (news[date] || []).forEach(item => arr.push({ date, item }));
+  });
+  return arr;
+}
+function newsItemMatches(entry, q) {
+  if (!q) return true;
+  const i = entry.item;
+  const haystack = [
+    i.code, i.bey,
+    ...(i.name || []), ...(i.ver || []), ...(i.desc || [])
+  ].filter(Boolean).join(" ").toLowerCase();
+  return haystack.includes(q);
+}
+function renderNewsSidebar(q) {
+  if (newsState.status === "loading" && !newsState.data) return `<div class="empty" style="padding:20px;">載入中…</div>`;
+  if (newsState.status === "error" && !newsState.data) return `<div class="empty" style="padding:20px;">載入失敗<br><span style="color:var(--muted); font-size:11px;">${newsState.error || ""}</span></div>`;
+  if (!newsState.data) return `<div class="empty" style="padding:20px;">尚無資料</div>`;
+
+  const dateGroups = {};
+  newsItems(newsState.data).filter(e => newsItemMatches(e, q)).forEach(e => {
+    (dateGroups[e.date] = dateGroups[e.date] || []).push(e.item);
+  });
+  const dates = Object.keys(dateGroups).sort().reverse();
+  if (!dates.length) return `<div class="empty" style="padding:20px;">沒有符合的條目</div>`;
+
+  return `<div class="group">
+    <div class="group-head"><span>日期</span><span class="count">${dates.length}</span></div>
+    <div class="group-body">
+      ${dates.map(d => `<div class="item" onclick="document.getElementById('news-date-${d}').scrollIntoView({behavior:'smooth', block:'start'})">
+        <span class="check">●</span>
+        <span class="name">${d}</span>
+        <span class="qty">${dateGroups[d].length}</span>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function newsTypePill(type) {
+  if (!type) return "";
+  const map = { att: "att", def: "def", sta: "sta", bal: "bal" };
+  const cls = map[type] || "";
+  return `<span class="pill ${cls}">${type}</span>`;
+}
+function renderNewsItem(entry) {
+  const i = entry.item;
+  const title = (i.name && (i.name[1] || i.name[0])) || i.bey || i.code || "(未命名)";
+  const subTitle = i.name && i.name[0] && i.name[0] !== title ? i.name[0] : (i.ver && (i.ver[1] || i.ver[0])) || "";
+  const verJp = i.ver && i.ver[0] && i.ver[1] !== subTitle ? i.ver[0] : "";
+  const imgs = (i.imgs || []).filter(Boolean);
+  const desc = (i.desc || []).filter(Boolean);
+  return `<div class="card news-card">
+    <div class="news-head">
+      <span class="news-code">${i.code || ""}</span>
+      ${newsTypePill(i.type)}
+    </div>
+    <h3 class="news-title">${title}</h3>
+    ${subTitle ? `<div class="sub">${subTitle}${verJp ? ` ・ ${verJp}` : ""}</div>` : ""}
+    ${i.bey && i.bey !== title ? `<div class="sub" style="font-family:monospace;">${i.bey}</div>` : ""}
+    ${imgs.length ? `<div class="news-imgs">
+      ${imgs.map(u => `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'"></a>`).join("")}
+    </div>` : ""}
+    ${desc.length ? `<ul class="news-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+function renderNews() {
+  if (newsState.status === "loading" && !newsState.data) return `<div class="empty">載入中…</div>`;
+  if (newsState.status === "error" && !newsState.data) return `<div class="empty">載入失敗<br><span style="color:var(--muted); font-size:12px;">${newsState.error || ""}</span><br><br><button onclick="fetchNews(true)">重試</button></div>`;
+  if (!newsState.data) return `<div class="empty">尚無資料</div>`;
+
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  const grouped = {};
+  newsItems(newsState.data).filter(e => newsItemMatches(e, q)).forEach(e => {
+    (grouped[e.date] = grouped[e.date] || []).push(e);
+  });
+  const dates = Object.keys(grouped).sort().reverse();
+  if (!dates.length) return `<div class="empty">沒有符合條件的情報</div>`;
+
+  const files = newsFiles(newsState.data);
+  const filesBlock = files.length ? `<details class="card" style="margin-bottom:14px;"><summary style="cursor:pointer; color:var(--muted);">資料檔最後更新時間（${files.length} 項）</summary>
+    <div style="margin-top:8px; font-size:12px;">
+      ${files.map(([k, v]) => `<div class="row"><span class="k" style="width:160px;">${k}</span><span class="v" style="font-family:monospace;">${v}</span></div>`).join("")}
+    </div></details>` : "";
+
+  return `<div>
+    <h2>最新情報</h2>
+    <div class="sub">資料來自 <a href="https://go-shoot.github.io/x/" target="_blank" rel="noopener">go-shoot.github.io/x/</a> ・ 共 ${newsItems(newsState.data).length} 則</div>
+    ${filesBlock}
+    ${dates.map(d => `<div id="news-date-${d}" class="news-date-section">
+      <h3 class="news-date-head">${d}</h3>
+      ${grouped[d].map(renderNewsItem).join("")}
+    </div>`).join("")}
+  </div>`;
 }
 
 function renderCollection() {
@@ -1356,6 +1594,10 @@ function renderProductDetail(p) {
   return `<div>
     <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span></h2>
     <div class="sub">擁有 ${ownedV}/${p.variants.length} 陀螺</div>
+    <div class="prod-img-wrap">
+      <img class="prod-img" src="${productImageSrc(p.id)}" alt="${p.id}"
+           loading="lazy" onerror="this.parentElement.style.display='none'">
+    </div>
     <div class="variants">${variants}</div>
   </div>`;
 }
@@ -1380,6 +1622,20 @@ function renderPartDetail(type, code) {
       <img class="bit-img" src="${bitImageSrc(code)}" alt="${code}"
            onerror="this.parentElement.style.display='none'">
     </div>` : ""}
+    ${type === "blade" && !info.isCx ? `<div class="bit-img-wrap">
+      <img class="bit-img" src="${bladeImageSrc(code)}" alt="${code}"
+           onerror="this.parentElement.style.display='none'">
+    </div>` : ""}
+    ${type === "blade" && info.isCx ? (() => {
+      const segs = cxBladeSegments(code).filter(Boolean);
+      if (!segs.length) return "";
+      return `<div class="bit-img-wrap" style="gap:8px;">
+        ${segs.map(s => `<figure class="cx-piece">
+          <img src="${s.src}" alt="${s.abbr}" onerror="this.parentElement.style.display='none'">
+          <figcaption>${(s.names && preferredChi(s.names.chi)) || s.abbr} <span class="cx-cat">${s.cat}</span></figcaption>
+        </figure>`).join("")}
+      </div>`;
+    })() : ""}
 
     <div class="card">
       <h3>零件資訊</h3>
@@ -1424,42 +1680,71 @@ function looksLikeShortCode(s) {
   return /^[A-Za-z]+\d*:/i.test(s) || (!s.startsWith("{") && /^[A-Za-z0-9+/=\s]+$/.test(s));
 }
 
-let exportFormat = "json"; // json | short
-
-function openExport() {
-  showModal("匯出收藏", `
-    <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <button id="fmt-json" class="${exportFormat === 'json' ? 'primary' : ''}" onclick="switchExportFormat('json')">📄 JSON (完整)</button>
-      <button id="fmt-short" class="${exportFormat === 'short' ? 'primary' : ''}" onclick="switchExportFormat('short')">📦 短碼 (壓縮)</button>
-    </div>
-    <p style="color:var(--muted); margin:0 0 6px; font-size:12px;" id="fmt-hint"></p>
-    <textarea class="io" id="io-text" readonly></textarea>
-  `, [
-    { label: "📋 複製", action: () => {
-      navigator.clipboard.writeText(document.getElementById("io-text").value);
-      alert("已複製到剪貼簿");
-    }},
-    { label: "💾 下載", primary: true, action: () => {
-      const ext = exportFormat === "json" ? "json" : "txt";
-      const blob = new Blob([document.getElementById("io-text").value], { type: "text/plain" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.${ext}`;
-      a.click();
-    }},
-    { label: "關閉", action: closeModal },
-  ]);
-  switchExportFormat(exportFormat);
+// 匯出 / 分享: 圖片 (PNG)、JSON (完整)、短碼 (壓縮) 三模式整合在同一個 modal
+let _expsMode = "image"; // image | json | short
+function openExportShare(initial = "image") {
+  _expsMode = initial;
+  _renderExpShare();
+}
+function _switchExpsMode(m) { _expsMode = m; _renderExpShare(); }
+function _renderExpShare() {
+  const mode = _expsMode;
+  const tabs = `<div class="exps-tabs">
+    <button class="${mode==='image'?'primary':''}" onclick="_switchExpsMode('image')">🖼 圖片</button>
+    <button class="${mode==='json'?'primary':''}" onclick="_switchExpsMode('json')">📄 JSON</button>
+    <button class="${mode==='short'?'primary':''}" onclick="_switchExpsMode('short')">📦 短碼</button>
+  </div>`;
+  let body, actions;
+  if (mode === "image") {
+    const canShare = !!(navigator.canShare && window.File);
+    body = tabs + `
+      <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">把目前收藏摘要做成 PNG 圖片，方便存到相簿或分享。</div>
+      <div style="margin-bottom: 10px;">
+        <label style="display:block; color: var(--muted); font-size: 12px; margin-bottom: 4px;">標題（留空使用預設）</label>
+        <input type="text" id="share-title" placeholder="Beyblade X 收藏" oninput="_scheduleSharePreview()" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+      </div>
+      <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer;">
+        <input type="checkbox" id="share-include-code" onchange="updateSharePreview()">
+        <span>包含匯入用短碼 (拍照即可給朋友匯入收藏)</span>
+      </label>
+      <div id="share-preview" style="background:#0f1115; border:1px solid var(--border); border-radius:8px; padding:8px; min-height:140px; max-height:50vh; overflow:auto; text-align:center; color:var(--muted);">產生中…</div>
+    `;
+    actions = [
+      { label: "💾 下載", primary: true, action: downloadShareImage },
+      ...(canShare ? [{ label: "🔗 分享…", action: shareImageNow }] : []),
+      { label: "關閉", action: closeModal },
+    ];
+  } else {
+    body = tabs + `
+      <p style="color:var(--muted); margin:0 0 6px; font-size:12px;" id="fmt-hint"></p>
+      <textarea class="io" id="io-text" readonly></textarea>
+    `;
+    actions = [
+      { label: "📋 複製", action: () => {
+        navigator.clipboard.writeText(document.getElementById("io-text").value);
+        alert("已複製到剪貼簿");
+      }},
+      { label: "💾 下載", primary: true, action: () => {
+        const ext = mode === "json" ? "json" : "txt";
+        const blob = new Blob([document.getElementById("io-text").value], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `beyx-collection-${new Date().toISOString().slice(0, 10)}.${ext}`;
+        a.click();
+      }},
+      { label: "關閉", action: closeModal },
+    ];
+  }
+  showModal("匯出 / 分享", body, actions);
+  if (mode === "image") {
+    _shareBlob = null;
+    updateSharePreview();
+  } else {
+    _populateExportText(mode);
+  }
 }
 
-async function switchExportFormat(fmt) {
-  exportFormat = fmt;
-  const btnJ = document.getElementById("fmt-json");
-  const btnS = document.getElementById("fmt-short");
-  if (btnJ && btnS) {
-    btnJ.classList.toggle("primary", fmt === "json");
-    btnS.classList.toggle("primary", fmt === "short");
-  }
+async function _populateExportText(fmt) {
   const exportData = {
     schema: "beyx_collection", version: 1,
     exportedAt: new Date().toISOString(),
@@ -1469,12 +1754,14 @@ async function switchExportFormat(fmt) {
   const json = JSON.stringify(exportData, null, fmt === "json" ? 2 : 0);
   const ta = document.getElementById("io-text");
   const hint = document.getElementById("fmt-hint");
+  if (!ta || !hint) return;
   if (fmt === "json") {
     ta.value = json;
     hint.textContent = `JSON 格式，${json.length} 字元。可直接看內容、易於版本控制。`;
   } else {
     ta.value = "壓縮中…";
     const code = await compressToShortCode(JSON.stringify({ schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [] }));
+    if (_expsMode !== fmt) return; // user switched away while compressing
     ta.value = code;
     hint.textContent = `短碼格式，${code.length} 字元 (壓縮率 ${(code.length / json.length * 100).toFixed(0)}%)。一行字串，方便分享/備份。`;
   }
@@ -1563,35 +1850,9 @@ function clearAll() {
 }
 
 // ============================================================
-// 分享 (匯出成圖片)
+// 分享 (匯出成圖片) — 入口在 openExportShare 的「圖片」分頁
 // ============================================================
 let _shareBlob = null;
-
-function openShare() {
-  const canShare = !!(navigator.canShare && window.File);
-  showModal("分享收藏", `
-    <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">
-      把目前收藏摘要做成 PNG 圖片，方便存到相簿或分享。
-    </div>
-    <div style="margin-bottom: 10px;">
-      <label style="display:block; color: var(--muted); font-size: 12px; margin-bottom: 4px;">標題（留空使用預設）</label>
-      <input type="text" id="share-title" placeholder="Beyblade X 收藏" oninput="_scheduleSharePreview()" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
-    </div>
-    <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer;">
-      <input type="checkbox" id="share-include-code" onchange="updateSharePreview()">
-      <span>包含匯入用短碼 (拍照即可給朋友匯入收藏)</span>
-    </label>
-    <div id="share-preview" style="background:#0f1115; border:1px solid var(--border); border-radius:8px; padding:8px; min-height:140px; max-height:50vh; overflow:auto; text-align:center; color:var(--muted);">
-      產生中…
-    </div>
-  `, [
-    { label: "💾 下載", primary: true, action: downloadShareImage },
-    ...(canShare ? [{ label: "🔗 分享…", action: shareImageNow }] : []),
-    { label: "關閉", action: closeModal },
-  ]);
-  _shareBlob = null;
-  updateSharePreview();
-}
 
 let _shareDebounce = null;
 function _scheduleSharePreview() {
