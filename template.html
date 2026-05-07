@@ -107,6 +107,10 @@
   .item .check.toggleable { cursor: pointer; }
   .item .check.toggleable:hover { background: rgba(78,161,255,0.2); color: var(--accent); }
   .item.owned .check.toggleable:hover { background: rgba(46,204,113,0.25); }
+  .item-thumb {
+    width: 28px; height: 28px; object-fit: contain;
+    background: #000; border-radius: 4px; flex-shrink: 0;
+  }
 
   .detail h2 { margin: 0 0 4px; font-size: 18px; }
   .detail .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
@@ -1014,8 +1018,12 @@ function renderPartList(q) {
           const display = cn
             ? `${cn} <span style='color:var(--muted); font-family:monospace; font-size:11px;'>${code}</span>`
             : `<span style='font-family:monospace;'>${code}</span>`;
+          const thumb = sec.key === "bit"
+            ? `<img class="item-thumb" src="${bitImageSrc(code)}" loading="lazy" onerror="this.style.visibility='hidden'">`
+            : "";
           return `<div class="item ${cls}" onclick="select('${sec.key}','${escapeAttr(code)}')">
             <span class="check">${isO ? "●" : "○"}</span>
+            ${thumb}
             <span class="name">${display}</span>
             <span class="qty">${PART_SOURCES[sec.key][code].length}</span>
           </div>`;
