@@ -145,10 +145,14 @@
   }
 
   .prod-img-wrap {
-    background: #fff; border: 1px solid var(--border); border-radius: 8px;
-    margin-bottom: 12px; padding: 12px; display: flex; justify-content: center;
+    margin-bottom: 12px; display: flex; justify-content: center;
+    background: var(--panel2); border-radius: 8px; padding: 6px;
   }
-  .prod-img { max-height: 320px; width: auto; object-fit: contain; }
+  /* 圖本身是白底 PNG, 用 multiply 把白色融進深色面板, 保留陀螺主體 */
+  .prod-img {
+    max-height: 260px; width: auto; object-fit: contain;
+    mix-blend-mode: multiply; filter: brightness(1.15);
+  }
 
   .news-date-section { margin-bottom: 18px; }
   .news-date-head {
@@ -303,7 +307,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.49</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-07">v0.50</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>

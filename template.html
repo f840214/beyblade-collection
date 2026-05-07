@@ -145,10 +145,14 @@
   }
 
   .prod-img-wrap {
-    background: #fff; border: 1px solid var(--border); border-radius: 8px;
-    margin-bottom: 12px; padding: 12px; display: flex; justify-content: center;
+    margin-bottom: 12px; display: flex; justify-content: center;
+    background: var(--panel2); border-radius: 8px; padding: 6px;
   }
-  .prod-img { max-height: 320px; width: auto; object-fit: contain; }
+  /* 圖本身是白底 PNG, 用 multiply 把白色融進深色面板, 保留陀螺主體 */
+  .prod-img {
+    max-height: 260px; width: auto; object-fit: contain;
+    mix-blend-mode: multiply; filter: brightness(1.15);
+  }
 
   .news-date-section { margin-bottom: 18px; }
   .news-date-head {
