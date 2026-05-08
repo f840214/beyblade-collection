@@ -170,8 +170,8 @@
   }
   .news-imgs img {
     max-height: 180px; max-width: 100%;
-    background: #fff; border: 1px solid var(--border); border-radius: 6px;
-    object-fit: contain;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px; object-fit: contain;
   }
   .news-desc { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
   .news-desc li { margin-bottom: 2px; color: var(--text); }
@@ -693,7 +693,7 @@ function buildFilters() {
   }
   if (activeTab === "news") {
     const updated = newsState.fetchedAt ? new Date(newsState.fetchedAt).toLocaleString() : "—";
-    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">資料來自 go-shoot.github.io ・ 上次更新 ${updated}</span>
+    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">上次更新 ${updated}</span>
       <button onclick="fetchNews(true)" style="margin-left:auto;">↻ 重新整理</button>`;
     searchEl.placeholder = "搜尋情報…";
     return;
@@ -1365,6 +1365,12 @@ function newsTypePill(type) {
   const cls = map[type] || "";
   return `<span class="pill ${cls}">${type}</span>`;
 }
+// 從 news code 抽商品代號 (e.g. "CX-17 random booster" → "CX-17"; "BXG-61" → "BXG-61")
+function newsExtractProductId(code) {
+  if (!code) return null;
+  const m = code.match(/^([A-Z]+)-?(\d+)/);
+  return m ? `${m[1]}-${m[2]}` : null;
+}
 function renderNewsItem(entry) {
   const i = entry.item;
   const title = (i.name && (i.name[1] || i.name[0])) || i.bey || i.code || "(未命名)";
@@ -1372,6 +1378,8 @@ function renderNewsItem(entry) {
   const verJp = i.ver && i.ver[0] && i.ver[1] !== subTitle ? i.ver[0] : "";
   const imgs = (i.imgs || []).filter(Boolean);
   const desc = (i.desc || []).filter(Boolean);
+  // 沒附圖時，用 news code 推商品代號去找本地 products/ 圖
+  const fallbackPid = imgs.length ? null : newsExtractProductId(i.code);
   return `<div class="card news-card">
     <div class="news-head">
       <span class="news-code">${i.code || ""}</span>
@@ -1382,6 +1390,8 @@ function renderNewsItem(entry) {
     ${i.bey && i.bey !== title ? `<div class="sub" style="font-family:monospace;">${i.bey}</div>` : ""}
     ${imgs.length ? `<div class="news-imgs">
       ${imgs.map(u => `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'"></a>`).join("")}
+    </div>` : fallbackPid ? `<div class="news-imgs">
+      <img src="${productImageSrc(fallbackPid)}" loading="lazy" alt="${fallbackPid}" onerror="this.parentElement.style.display='none'">
     </div>` : ""}
     ${desc.length ? `<ul class="news-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>` : ""}
   </div>`;
@@ -1407,7 +1417,7 @@ function renderNews() {
 
   return `<div>
     <h2>最新情報</h2>
-    <div class="sub">資料來自 <a href="https://go-shoot.github.io/x/" target="_blank" rel="noopener">go-shoot.github.io/x/</a> ・ 共 ${newsItems(newsState.data).length} 則</div>
+    <div class="sub">共 ${newsItems(newsState.data).length} 則</div>
     ${filesBlock}
     ${dates.map(d => `<div id="news-date-${d}" class="news-date-section">
       <h3 class="news-date-head">${d}</h3>
