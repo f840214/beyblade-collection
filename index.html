@@ -303,7 +303,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-08">v0.52</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-08">v0.55</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button onclick="openImport()">📥 匯入</button>
@@ -468,7 +468,7 @@ function cxBladeSegments(code) {
   });
 }
 
-// 商品圖片來源: 本地預處理的透明 PNG (rembg 從 Takara Tomy 官圖去背)
+// 商品圖片來源: 本地預處理的透明 PNG (rembg + isnet-general-use 從 Takara Tomy 官圖去背)
 // 只涵蓋 BX/BXG/CX/UX; BXH/BXA/BXC 沒對應圖會 onerror 隱藏
 function productImageSrc(pid) {
   return `products/${pid.replace(/-/g, "")}@1.png`;
