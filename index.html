@@ -2263,7 +2263,7 @@ function _scheduleTokenRefresh(ttlSeconds) {
   const refreshIn = Math.max(30, ttlSeconds - 300) * 1000; // 過期前 5 分鐘
   _refreshTimer = setTimeout(async () => {
     if (!localStorage.getItem(SYNC_FLAG_KEY)) return;
-    try { await _requestToken(false); }
+    try { await _requestToken("silent"); }
     catch (e) {
       // 靜默失敗就讓下次互動再處理，不打擾使用者
       _clearCachedToken();
@@ -2324,14 +2324,18 @@ async function _waitForGis(timeoutMs = 5000) {
   }
 }
 
-// 取得 access token (interactive=true 會跳同意視窗，false 嘗試靜默)
-function _requestToken(interactive) {
+// 取得 access token
+// mode: "interactive" 會跳同意視窗 (使用者主動點同步登入)
+//       "silent"      用 prompt:"none"，需要互動就 fail，絕不彈視窗
+//       "default"     用 prompt:""，由 Google 決定彈不彈 (第一次重連時用)
+function _requestToken(mode = "default") {
   return new Promise((resolve, reject) => {
     if (!_gisReady()) return reject(new Error("GIS 未就緒"));
+    const promptVal = mode === "interactive" ? "consent" : mode === "silent" ? "none" : "";
     const client = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: DRIVE_SCOPE,
-      prompt: interactive ? "consent" : "",
+      prompt: promptVal,
       callback: (resp) => {
         if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
         Sync.accessToken = resp.access_token;
@@ -2340,7 +2344,7 @@ function _requestToken(interactive) {
       },
       error_callback: (err) => reject(new Error(err.message || err.type || "授權失敗")),
     });
-    try { client.requestAccessToken({ prompt: interactive ? "consent" : "" }); }
+    try { client.requestAccessToken({ prompt: promptVal }); }
     catch (e) { reject(e); }
   });
 }
@@ -2350,9 +2354,9 @@ async function _driveFetch(path, opts = {}) {
   const headers = Object.assign({ Authorization: "Bearer " + Sync.accessToken }, opts.headers || {});
   const r = await fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
   if (r.status === 401) {
-    // token 被 Drive 拒絕 → 清掉快取再嘗試靜默刷新一次
+    // token 被 Drive 拒絕 → 清掉快取再嘗試靜默刷新一次 (不彈視窗)
     _clearCachedToken();
-    await _requestToken(false);
+    await _requestToken("silent");
     headers.Authorization = "Bearer " + Sync.accessToken;
     return fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
   }
@@ -2405,7 +2409,7 @@ async function syncSignIn() {
   try {
     _syncSetStatus("syncing", "登入中…");
     await _waitForGis();
-    await _requestToken(true);
+    await _requestToken("interactive");
     localStorage.setItem(SYNC_FLAG_KEY, "1");
     _syncSetStatus("signed-in", "已登入");
     await syncReconcile();
@@ -2659,19 +2663,33 @@ async function syncBootstrap() {
     syncReconcile(); // 不 await，讓畫面先回應
     return;
   }
-  // 沒有有效快取 → 嘗試靜默重連 (這可能會閃 popup，所以只在快取真的過期時做)
+  // 沒有有效快取 → 嘗試靜默重連
+  await _attemptSilentSignIn();
+}
+
+// 嘗試靜默登入。失敗時保留「曾登入過」旗標，下次有機會 (重整、回到分頁) 再試
+async function _attemptSilentSignIn() {
   try {
     _syncSetStatus("syncing", "重新連線中…");
     await _waitForGis(8000);
-    await _requestToken(false);
+    await _requestToken("silent");
     _syncSetStatus("signed-in");
     await syncReconcile();
+    return true;
   } catch (e) {
-    // 靜默失敗就還原成「未登入」狀態，等使用者主動點
-    localStorage.removeItem(SYNC_FLAG_KEY);
-    _syncSetStatus("signed-out", "請重新登入");
+    // 不清旗標 — 可能只是暫時的網路 / GIS 載入問題，下次再試
+    _syncSetStatus("signed-out", "點同步重新連線");
+    return false;
   }
 }
+
+// 切回分頁時，如果旗標還在但沒 token，趁機靜默重連
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (localStorage.getItem(SYNC_FLAG_KEY) !== "1") return;
+  if (Sync.accessToken) return;
+  _attemptSilentSignIn();
+});
 
 // ============================================================
 // 啟動
