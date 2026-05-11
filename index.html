@@ -335,7 +335,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-11">v0.61</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-11">v0.62</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button id="sync-btn" onclick="openSyncDialog()" title="同步到 Google Drive"><svg viewBox="0 0 48 48" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" aria-hidden="true"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg><span id="sync-btn-label">同步</span></button>
@@ -2305,20 +2305,9 @@ function _saveCachedToken(token, expiresIn) {
   } catch (e) {}
   _scheduleTokenRefresh(ttl);
 }
-// 在 token 過期前 5 分鐘背景靜默續期，這樣使用者完全不會看到 popup
-let _refreshTimer = null;
-function _scheduleTokenRefresh(ttlSeconds) {
-  clearTimeout(_refreshTimer);
-  const refreshIn = Math.max(30, ttlSeconds - 300) * 1000; // 過期前 5 分鐘
-  _refreshTimer = setTimeout(async () => {
-    if (!localStorage.getItem(SYNC_FLAG_KEY)) return;
-    try { await _requestToken("silent"); }
-    catch (e) {
-      // 靜默失敗就讓下次互動再處理，不打擾使用者
-      _clearCachedToken();
-    }
-  }, refreshIn);
-}
+// 取消主動續期: GIS 即使 silent 仍會閃視窗。改成被動 — token 過期就過期，
+// 使用者下次主動點同步按鈕才走 interactive 流程拿新 token。
+function _scheduleTokenRefresh(_ttlSeconds) { /* no-op */ }
 function _loadCachedToken() {
   try {
     const c = JSON.parse(localStorage.getItem(SYNC_TOKEN_KEY) || "null");
@@ -2403,11 +2392,11 @@ async function _driveFetch(path, opts = {}) {
   const headers = Object.assign({ Authorization: "Bearer " + Sync.accessToken }, opts.headers || {});
   const r = await fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
   if (r.status === 401) {
-    // token 被 Drive 拒絕 → 清掉快取再嘗試靜默刷新一次 (不彈視窗)
+    // token 被 Drive 拒絕 → 清掉快取與本地 token，標示需要使用者重連
     _clearCachedToken();
-    await _requestToken("silent");
-    headers.Authorization = "Bearer " + Sync.accessToken;
-    return fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
+    Sync.accessToken = null;
+    _syncSetStatus("signed-out", "點同步重新連線");
+    throw new Error("授權過期，請重新登入");
   }
   return r;
 }
@@ -2695,8 +2684,8 @@ function _renderSyncDialog() {
   showModal("雲端同步", body, actions);
 }
 
-// 啟動: 如果之前曾登入過且 token 還在有效期內，直接用快取的 token
-// (避免每次重整都重跑 OAuth 跳 popup)
+// 啟動: 如果有有效快取 token 直接用；過期就停在「signed-out + 提示」狀態，
+// 不主動跑 silent OAuth (GIS 即使 prompt:"none" 也會閃視窗)，等使用者按按鈕。
 async function syncBootstrap() {
   if (!GOOGLE_CLIENT_ID) { _syncSetStatus("signed-out"); return; }
   if (localStorage.getItem(SYNC_FLAG_KEY) !== "1") { _syncSetStatus("signed-out"); return; }
@@ -2704,36 +2693,12 @@ async function syncBootstrap() {
   if (cached) {
     Sync.accessToken = cached;
     _syncSetStatus("signed-in");
-    // 排定下次背景續期 (依快取剩餘時間)
-    try {
-      const c = JSON.parse(localStorage.getItem(SYNC_TOKEN_KEY) || "{}");
-      if (c.expiresAt) _scheduleTokenRefresh(Math.max(30, Math.floor((c.expiresAt - Date.now()) / 1000)));
-    } catch (e) {}
     syncReconcile(); // 不 await，讓畫面先回應
     return;
   }
-  // 沒有有效快取 → 嘗試靜默重連
-  await _attemptSilentSignIn();
+  // 沒有有效快取 → 不彈視窗，標示「點同步重新連線」等使用者主動按
+  _syncSetStatus("signed-out", "點同步重新連線");
 }
-
-// 嘗試靜默登入。失敗時保留「曾登入過」旗標，下次有機會 (重整、回到分頁) 再試
-async function _attemptSilentSignIn() {
-  try {
-    _syncSetStatus("syncing", "重新連線中…");
-    await _waitForGis(8000);
-    await _requestToken("silent");
-    _syncSetStatus("signed-in");
-    await syncReconcile();
-    return true;
-  } catch (e) {
-    // 不清旗標 — 可能只是暫時的網路 / GIS 載入問題，下次再試
-    _syncSetStatus("signed-out", "點同步重新連線");
-    return false;
-  }
-}
-
-// (移除自動 visibilitychange 重連 — GIS 即使用 prompt:"none" 偶爾仍會閃出視窗，
-//  改成讓使用者看到「點同步重新連線」提示後手動按。)
 
 // ============================================================
 // 啟動
