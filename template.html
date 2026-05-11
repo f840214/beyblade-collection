@@ -488,6 +488,9 @@ function bitInfo(code) { return DB.bit[code] || { names: { chi: "(未知)" } }; 
 function bitImageSrc(code) {
   return `bits/${encodeURIComponent(code)}.png`;
 }
+function ratchetImageSrc(code) {
+  return `ratchets/${encodeURIComponent(code)}.png`;
+}
 
 // 戰刃圖片來源
 // 單體戰刃: blades/{abbr}.png
@@ -1187,6 +1190,8 @@ function renderPartList(q) {
           let thumb = "";
           if (sec.key === "bit") {
             thumb = `<img class="item-thumb" src="${bitImageSrc(code)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+          } else if (sec.key === "ratchet") {
+            thumb = `<img class="item-thumb" src="${ratchetImageSrc(code)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
           } else if (sec.key === "blade") {
             const single = bladeImageSrc(code);
             if (single) {
@@ -1243,10 +1248,37 @@ function renderBuildEditor(id) {
     const inf = code ? info(code) : null;
     const cn = code ? nameFn(code, inf) : "";
     const ow = code && ownedSet.has(code);
-    const main = code
-      ? `<div style="margin-top:6px; font-size:18px; font-weight:600;">${cn || code}</div>
-         <div style="color:var(--muted); font-size:12px; font-family:monospace; margin-top:2px;">
-           ${code} ${ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`}
+    // 縮圖：橫向卡片佈局，固定 60px 高
+    let thumbHtml = "";
+    if (code) {
+      const thumbStyle = "width:60px; height:60px; object-fit:contain; flex-shrink:0; background:rgba(255,255,255,0.02); border-radius:4px;";
+      if (key === "blade") {
+        const single = bladeImageSrc(code);
+        if (single) {
+          thumbHtml = `<img style="${thumbStyle}" src="${single}" alt="${code}" onerror="this.style.visibility='hidden'">`;
+        } else {
+          const segs = cxBladeSegments(code).filter(Boolean);
+          if (segs.length) {
+            // CX 組合：用第一段 (通常是 chip) 當代表縮圖
+            const head = segs.find(s => s.cat === "chip") || segs[0];
+            thumbHtml = `<img style="${thumbStyle}" src="${head.src}" alt="${head.abbr}" onerror="this.style.visibility='hidden'">`;
+          }
+        }
+      } else if (key === "ratchet") {
+        thumbHtml = `<img style="${thumbStyle}" src="${ratchetImageSrc(code)}" alt="${code}" onerror="this.style.visibility='hidden'">`;
+      } else if (key === "bit") {
+        thumbHtml = `<img style="${thumbStyle}" src="${bitImageSrc(code)}" alt="${code}" onerror="this.style.visibility='hidden'">`;
+      }
+    }
+    const body = code
+      ? `<div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+           ${thumbHtml}
+           <div style="flex:1; min-width:0;">
+             <div style="font-size:15px; font-weight:600; line-height:1.3;">${cn || code}</div>
+             <div style="color:var(--muted); font-size:11px; font-family:monospace; margin-top:2px;">
+               ${code} ${ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`}
+             </div>
+           </div>
          </div>`
       : `<div style="margin-top:6px; color:var(--muted);">— 未選 —</div>`;
     return `<div class="card" style="cursor:pointer" onclick="openPartPicker('${id}','${key}')">
@@ -1254,7 +1286,7 @@ function renderBuildEditor(id) {
         <h3 style="margin:0; font-size:13px; color:var(--accent2);">${label}</h3>
         <span style="margin-left:auto; color:var(--muted); font-size:11px;">${code ? "點此變更" : "點此選擇"} ▸</span>
       </div>
-      ${main}
+      ${body}
       ${code && code !== "" ? `<button onclick="event.stopPropagation(); updateBuildField('${id}','${key}',''); render();" style="margin-top:8px; font-size:11px; padding:3px 8px;" class="danger">清除</button>` : ""}
     </div>`;
   };
@@ -1326,12 +1358,25 @@ function renderPartPickerList() {
     listEl.innerHTML = `<div class="empty" style="padding:20px;">沒有符合條件</div>`;
     return;
   }
+  // 縮圖：picker 列表用 40×40 小圖
+  const thumbStyle = "width:40px; height:40px; object-fit:contain; flex-shrink:0; background:rgba(255,255,255,0.02); border-radius:4px;";
+  const pickerThumb = (slot, c) => {
+    if (slot === "bit") return `<img style="${thumbStyle}" src="${bitImageSrc(c)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+    if (slot === "ratchet") return `<img style="${thumbStyle}" src="${ratchetImageSrc(c)}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+    // blade
+    const single = bladeImageSrc(c);
+    if (single) return `<img style="${thumbStyle}" src="${single}" loading="lazy" onerror="this.style.visibility='hidden'">`;
+    const segs = cxBladeSegments(c).filter(Boolean);
+    const head = segs.find(s => s.cat === "chip") || segs[0];
+    return head ? `<img style="${thumbStyle}" src="${head.src}" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div style="${thumbStyle}"></div>`;
+  };
   listEl.innerHTML = filtered.map(c => {
     const inf = info(c);
     const cn = nameFn(c, inf);
     const ow = ownedSet.has(c);
-    return `<div class="item ${ow ? 'owned' : ''}" style="padding:8px 12px; cursor:pointer;" onclick="pickPart('${escapeAttr(c)}')">
+    return `<div class="item ${ow ? 'owned' : ''}" style="padding:6px 12px; cursor:pointer; gap:10px;" onclick="pickPart('${escapeAttr(c)}')">
       <span class="check">${ow ? '●' : '○'}</span>
+      ${pickerThumb(ctx.slot, c)}
       <span class="name">${cn || c}</span>
       ${cn ? `<span style="margin-left:auto; color:var(--muted); font-family:monospace; font-size:11px;">${c}</span>` : ''}
     </div>`;
@@ -1676,6 +1721,10 @@ function renderPartDetail(type, code) {
 
     ${type === "bit" ? `<div class="bit-img-wrap">
       <img class="bit-img" src="${bitImageSrc(code)}" alt="${code}"
+           onerror="this.parentElement.style.display='none'">
+    </div>` : ""}
+    ${type === "ratchet" ? `<div class="bit-img-wrap">
+      <img class="bit-img" src="${ratchetImageSrc(code)}" alt="${code}"
            onerror="this.parentElement.style.display='none'">
     </div>` : ""}
     ${type === "blade" && !info.isCx ? `<div class="bit-img-wrap">
@@ -2683,13 +2732,8 @@ async function _attemptSilentSignIn() {
   }
 }
 
-// 切回分頁時，如果旗標還在但沒 token，趁機靜默重連
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
-  if (localStorage.getItem(SYNC_FLAG_KEY) !== "1") return;
-  if (Sync.accessToken) return;
-  _attemptSilentSignIn();
-});
+// (移除自動 visibilitychange 重連 — GIS 即使用 prompt:"none" 偶爾仍會閃出視窗，
+//  改成讓使用者看到「點同步重新連線」提示後手動按。)
 
 // ============================================================
 // 啟動
