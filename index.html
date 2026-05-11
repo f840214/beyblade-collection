@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BeyX 收藏">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --bg: #0f1115;
@@ -41,7 +42,12 @@
   header h1 { margin: 0; font-size: 16px; font-weight: 600; }
   header .stats { color: var(--muted); font-size: 12px; }
   header .stats b { color: var(--text); font-weight: 600; }
-  header .actions { margin-left: auto; display: flex; gap: 6px; }
+  header .actions { margin-left: auto; display: flex; gap: 6px; align-items: stretch; }
+  header .actions > button,
+  header .actions .more-wrap > button {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 32px; line-height: 1; padding: 0 12px;
+  }
   button {
     background: var(--panel2); color: var(--text); border: 1px solid var(--border);
     padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
@@ -52,10 +58,36 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #001833; }
   button.primary:hover { background: #6cb3ff; }
   button.danger { color: var(--missing); }
+  #sync-btn.syncing #sync-btn-label::after { content: "…"; }
+  #sync-btn.synced { color: var(--owned); }
+  #sync-btn.error { color: var(--missing); }
+  #sync-btn.signed-out { color: var(--muted); }
+  .more-wrap { position: relative; display: inline-block; }
+  .more-menu {
+    position: absolute; top: calc(100% + 4px); right: 0;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; min-width: 170px; padding: 4px 0;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+    z-index: 60; display: none;
+  }
+  .more-menu.open { display: block; }
+  .more-menu button {
+    display: block; width: 100%; text-align: left;
+    border: none; border-radius: 0; padding: 8px 14px;
+    background: transparent; font-size: 13px;
+  }
+  .more-menu button:hover { background: var(--panel2); }
+  .more-menu hr {
+    border: none; border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+  .sync-row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .sync-row:last-child { border-bottom:none; }
+  .sync-row span:first-child { color: var(--muted); }
 
   .layout { display: grid; grid-template-columns: 380px 1fr; height: calc(100vh - 49px); }
   .sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--panel); }
-  .main { overflow: auto; padding: 16px 20px; }
+  .main { overflow: auto; padding: 16px 20px calc(32px + env(safe-area-inset-bottom)); }
 
   .tabs { display: flex; border-bottom: 1px solid var(--border); }
   .tab {
@@ -73,7 +105,7 @@
   .filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
   .filters input { margin: 0; }
 
-  .list { flex: 1; overflow: auto; padding: 4px 0; }
+  .list { flex: 1; overflow: auto; padding: 4px 0; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .group {
     border-top: 1px solid var(--border);
   }
@@ -303,13 +335,20 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-08">v0.55</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-11">v0.60</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
-    <button onclick="openImport()">📥 匯入</button>
+    <button id="sync-btn" onclick="openSyncDialog()" title="同步到 Google Drive"><svg viewBox="0 0 48 48" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" aria-hidden="true"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg><span id="sync-btn-label">同步</span></button>
     <button onclick="switchTab('news')">📰 情報</button>
-    <button onclick="openExportShare()">📤 匯出 / 分享</button>
-    <button class="danger" onclick="clearAll()">清空</button>
+    <div class="more-wrap">
+      <button id="more-btn" onclick="toggleMoreMenu(event)" title="更多選項" aria-haspopup="true"><svg viewBox="0 0 16 16" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" fill="currentColor" aria-hidden="true"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>選單</button>
+      <div id="more-menu" class="more-menu" role="menu">
+        <button onclick="closeMoreMenu(); openImport()">📥 匯入</button>
+        <button onclick="closeMoreMenu(); openExportShare()">📤 匯出 / 分享</button>
+        <hr>
+        <button class="danger" onclick="closeMoreMenu(); clearAll()">🗑 清空</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -543,13 +582,19 @@ function loadState() {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (s && s.owned) {
       if (!Array.isArray(s.builds)) s.builds = [];
+      if (typeof s.updatedAt !== "number") s.updatedAt = 0;
+      if (!s.prefs || typeof s.prefs !== "object") s.prefs = {};
       return s;
     }
   } catch (e) {}
-  return { owned: {}, builds: [] };  // owned[variantId] = qty; builds[]={id,name,blade,ratchet,bit,note}
+  return { owned: {}, builds: [], updatedAt: 0, prefs: {} };
 }
+// 是否正在從 Drive 套用遠端資料 (套用過程不應該再回推)
+let _applyingRemote = false;
 function saveState() {
+  if (!_applyingRemote) state.updatedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (!_applyingRemote && typeof scheduleSyncPush === "function") scheduleSyncPush();
 }
 function setOwned(vid, qty) {
   qty = Math.max(0, parseInt(qty) || 0);
@@ -1712,7 +1757,7 @@ function _renderExpShare() {
       <div style="color: var(--muted); font-size: 12px; margin-bottom: 10px;">把目前收藏摘要做成 PNG 圖片，方便存到相簿或分享。</div>
       <div style="margin-bottom: 10px;">
         <label style="display:block; color: var(--muted); font-size: 12px; margin-bottom: 4px;">標題（留空使用預設）</label>
-        <input type="text" id="share-title" placeholder="Beyblade X 收藏" oninput="_scheduleSharePreview()" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+        <input type="text" id="share-title" placeholder="Beyblade X 收藏" value="${(state.prefs && state.prefs.shareTitle) ? state.prefs.shareTitle.replace(/"/g, "&quot;") : ""}" oninput="_onShareTitleInput()" style="width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
       </div>
       <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; cursor: pointer;">
         <input type="checkbox" id="share-include-code" onchange="updateSharePreview()">
@@ -1854,8 +1899,10 @@ async function doImport(replace) {
 }
 
 function clearAll() {
-  if (!confirm("確定要清空所有擁有紀錄？")) return;
+  if (!confirm("確定要清空所有擁有紀錄與配置？")) return;
   state.owned = {};
+  state.builds = [];
+  selected = null;
   saveState();
   render();
 }
@@ -1869,6 +1916,13 @@ let _shareDebounce = null;
 function _scheduleSharePreview() {
   clearTimeout(_shareDebounce);
   _shareDebounce = setTimeout(updateSharePreview, 250);
+}
+function _onShareTitleInput() {
+  const v = document.getElementById("share-title").value;
+  state.prefs = state.prefs || {};
+  state.prefs.shareTitle = v;
+  saveState();
+  _scheduleSharePreview();
 }
 
 async function updateSharePreview() {
@@ -2160,10 +2214,449 @@ function showModal(title, bodyHtml, actions) {
 }
 function closeModal() { document.getElementById("modal-bg").classList.remove("open"); }
 
+// 漢堡選單
+function toggleMoreMenu(e) {
+  if (e) e.stopPropagation();
+  document.getElementById("more-menu").classList.toggle("open");
+}
+function closeMoreMenu() {
+  document.getElementById("more-menu").classList.remove("open");
+}
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("more-menu");
+  if (!menu || !menu.classList.contains("open")) return;
+  if (e.target.closest("#more-menu") || e.target.closest("#more-btn")) return;
+  closeMoreMenu();
+});
+
+// ============================================================
+// Google Drive 同步 (appDataFolder)
+// ------------------------------------------------------------
+// 把 state ({owned, builds, updatedAt}) 同步到使用者自己的 Google Drive
+// 應用資料夾。資料只有使用者本人看得到，本網站後端不存任何東西。
+//
+// 設定步驟：到 Google Cloud Console 建立 OAuth 2.0 Client ID
+// (應用程式類型: 網頁應用程式)，授權的 JavaScript 來源加入本站網址，
+// 然後把 client id 填到下面的 GOOGLE_CLIENT_ID。
+// ============================================================
+const GOOGLE_CLIENT_ID = "130526280028-irofuaj6jimrjp34i2t2efh2cva6hmte.apps.googleusercontent.com";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_FILE_NAME = "beyx-collection.json";
+const SYNC_FLAG_KEY = "beyx_sync_signed_in"; // localStorage 中標記「上次有登入過」
+const SYNC_TOKEN_KEY = "beyx_sync_token"; // 快取 access token (1 小時內可重用，避免每次重整都重跑 OAuth)
+const SYNC_DEBOUNCE_MS = 3000;
+
+function _saveCachedToken(token, expiresIn) {
+  try {
+    localStorage.setItem(SYNC_TOKEN_KEY, JSON.stringify({
+      token,
+      expiresAt: Date.now() + Math.max(0, (Number(expiresIn) || 3600) - 60) * 1000, // 留 60 秒安全餘裕
+    }));
+  } catch (e) {}
+}
+function _loadCachedToken() {
+  try {
+    const c = JSON.parse(localStorage.getItem(SYNC_TOKEN_KEY) || "null");
+    if (c && c.token && c.expiresAt > Date.now()) return c.token;
+  } catch (e) {}
+  return null;
+}
+function _clearCachedToken() {
+  try { localStorage.removeItem(SYNC_TOKEN_KEY); } catch (e) {}
+}
+
+const Sync = {
+  accessToken: null,
+  fileId: null,
+  status: "signed-out", // signed-out | signed-in | syncing | synced | error
+  message: "",
+  lastSyncAt: 0,
+  remoteUpdatedAt: 0,
+  _pushTimer: null,
+  _pushInFlight: false,
+  _pushAgain: false,
+};
+
+function _syncSetStatus(status, message = "") {
+  Sync.status = status;
+  Sync.message = message;
+  const btn = document.getElementById("sync-btn");
+  const label = document.getElementById("sync-btn-label");
+  if (!btn || !label) return;
+  btn.classList.remove("syncing", "synced", "error", "signed-out");
+  if (status === "syncing") { btn.classList.add("syncing"); label.textContent = "同步中"; }
+  else if (status === "synced") { btn.classList.add("synced"); label.textContent = "已同步"; }
+  else if (status === "error") { btn.classList.add("error"); label.textContent = "同步錯誤"; }
+  else if (status === "signed-in") { label.textContent = "同步"; }
+  else { btn.classList.add("signed-out"); label.textContent = "同步"; }
+  // 如果同步對話框打開著，重繪
+  if (document.getElementById("modal-bg").classList.contains("open") &&
+      document.getElementById("sync-dialog-marker")) {
+    _renderSyncDialog();
+  }
+}
+
+function _gisReady() {
+  return typeof google !== "undefined" && google.accounts && google.accounts.oauth2;
+}
+
+async function _waitForGis(timeoutMs = 5000) {
+  const start = Date.now();
+  while (!_gisReady()) {
+    if (Date.now() - start > timeoutMs) throw new Error("Google 登入腳本載入逾時");
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+// 取得 access token (interactive=true 會跳同意視窗，false 嘗試靜默)
+function _requestToken(interactive) {
+  return new Promise((resolve, reject) => {
+    if (!_gisReady()) return reject(new Error("GIS 未就緒"));
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      prompt: interactive ? "consent" : "",
+      callback: (resp) => {
+        if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
+        Sync.accessToken = resp.access_token;
+        _saveCachedToken(resp.access_token, resp.expires_in);
+        resolve(resp.access_token);
+      },
+      error_callback: (err) => reject(new Error(err.message || err.type || "授權失敗")),
+    });
+    try { client.requestAccessToken({ prompt: interactive ? "consent" : "" }); }
+    catch (e) { reject(e); }
+  });
+}
+
+async function _driveFetch(path, opts = {}) {
+  if (!Sync.accessToken) throw new Error("未授權");
+  const headers = Object.assign({ Authorization: "Bearer " + Sync.accessToken }, opts.headers || {});
+  const r = await fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
+  if (r.status === 401) {
+    // token 被 Drive 拒絕 → 清掉快取再嘗試靜默刷新一次
+    _clearCachedToken();
+    await _requestToken(false);
+    headers.Authorization = "Bearer " + Sync.accessToken;
+    return fetch("https://www.googleapis.com/" + path, Object.assign({}, opts, { headers }));
+  }
+  return r;
+}
+
+async function _findSyncFile() {
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+  const r = await _driveFetch(`drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)`);
+  if (!r.ok) throw new Error("查詢檔案失敗: " + r.status);
+  const data = await r.json();
+  return data.files && data.files[0] ? data.files[0] : null;
+}
+
+async function _downloadSyncFile(fileId) {
+  const r = await _driveFetch(`drive/v3/files/${fileId}?alt=media`);
+  if (!r.ok) throw new Error("下載失敗: " + r.status);
+  return r.json();
+}
+
+async function _uploadSyncFile(fileId, body) {
+  // multipart upload: 同時送 metadata 和 content
+  const metadata = fileId ? {} : { name: DRIVE_FILE_NAME, parents: ["appDataFolder"] };
+  const boundary = "beyx_" + Math.random().toString(36).slice(2);
+  const payload =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(metadata) + `\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: application/json\r\n\r\n` +
+    JSON.stringify(body) + `\r\n` +
+    `--${boundary}--`;
+  const url = fileId
+    ? `upload/drive/v3/files/${fileId}?uploadType=multipart&fields=id,modifiedTime`
+    : `upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime`;
+  const r = await _driveFetch(url, {
+    method: fileId ? "PATCH" : "POST",
+    headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+    body: payload,
+  });
+  if (!r.ok) throw new Error("上傳失敗: " + r.status + " " + (await r.text()).slice(0, 200));
+  return r.json();
+}
+
+async function syncSignIn() {
+  if (!GOOGLE_CLIENT_ID) {
+    alert("尚未設定 Google OAuth Client ID。\n\n請開啟 template.html，搜尋 GOOGLE_CLIENT_ID 並填入你在 Google Cloud Console 申請的 Client ID。");
+    return;
+  }
+  try {
+    _syncSetStatus("syncing", "登入中…");
+    await _waitForGis();
+    await _requestToken(true);
+    localStorage.setItem(SYNC_FLAG_KEY, "1");
+    _syncSetStatus("signed-in", "已登入");
+    await syncReconcile();
+  } catch (e) {
+    _syncSetStatus("error", e.message);
+  }
+}
+
+function syncSignOut() {
+  if (Sync.accessToken && _gisReady()) {
+    google.accounts.oauth2.revoke(Sync.accessToken, () => {});
+  }
+  Sync.accessToken = null;
+  Sync.fileId = null;
+  Sync.remoteUpdatedAt = 0;
+  localStorage.removeItem(SYNC_FLAG_KEY);
+  _clearCachedToken();
+  _syncSetStatus("signed-out", "已登出");
+}
+
+// 登入後/啟動後對齊本機與遠端
+async function syncReconcile() {
+  try {
+    _syncSetStatus("syncing", "對齊資料中…");
+    const file = await _findSyncFile();
+    if (!file) {
+      // 遠端沒檔 → 上傳本機 (即使空也建檔，後續才好同步)
+      await syncPushNow(true);
+      return;
+    }
+    Sync.fileId = file.id;
+    const remote = await _downloadSyncFile(file.id);
+    const remoteUpdatedAt = remote && typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
+    Sync.remoteUpdatedAt = remoteUpdatedAt;
+    const localUpdatedAt = state.updatedAt || 0;
+    const localEmpty = Object.keys(state.owned).length === 0 && (state.builds || []).length === 0;
+
+    if (remoteUpdatedAt > localUpdatedAt) {
+      // 遠端較新
+      if (localEmpty || !localUpdatedAt) {
+        _applyRemote(remote);
+        _syncSetStatus("synced", "已從雲端拉取");
+        Sync.lastSyncAt = Date.now();
+      } else {
+        // 兩邊都有資料 → 問使用者
+        _syncSetStatus("signed-in", "需要選擇方向");
+        _promptConflict(remote);
+      }
+    } else if (localUpdatedAt > remoteUpdatedAt) {
+      await syncPushNow(true);
+    } else {
+      _syncSetStatus("synced", "已是最新");
+      Sync.lastSyncAt = Date.now();
+    }
+  } catch (e) {
+    _syncSetStatus("error", e.message);
+  }
+}
+
+function _applyRemote(remote) {
+  _applyingRemote = true;
+  try {
+    state.owned = (remote && remote.owned) || {};
+    state.builds = Array.isArray(remote && remote.builds) ? remote.builds : [];
+    state.updatedAt = (remote && remote.updatedAt) || Date.now();
+    saveState();
+  } finally {
+    _applyingRemote = false;
+  }
+  render();
+}
+
+function _promptConflict(remote) {
+  const lOwned = Object.keys(state.owned).length;
+  const lBuilds = (state.builds || []).length;
+  const rOwned = Object.keys(remote.owned || {}).length;
+  const rBuilds = (remote.builds || []).length;
+  const lTime = state.updatedAt ? new Date(state.updatedAt).toLocaleString() : "(未知)";
+  const rTime = remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)";
+  showModal("同步衝突", `
+    <p style="margin-top:0;">本機與雲端各有不同的資料，請選擇一邊：</p>
+    <div class="sync-row"><span>本機更新時間</span><span>${lTime}</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${lOwned} 個變體 / ${lBuilds} 個配置</span></div>
+    <div class="sync-row"><span>雲端更新時間</span><span>${rTime}</span></div>
+    <div class="sync-row"><span>雲端資料</span><span>${rOwned} 個變體 / ${rBuilds} 個配置</span></div>
+    <p style="color: var(--muted); font-size:12px; margin-top:10px;">「合併」會把兩邊的 owned 取較大數量，builds 用 id 去重後保留兩邊。</p>
+  `, [
+    { label: "用雲端覆蓋本機", action: () => { _applyRemote(remote); closeModal(); _syncSetStatus("synced", "已從雲端拉取"); Sync.lastSyncAt = Date.now(); } },
+    { label: "用本機覆蓋雲端", primary: true, action: async () => { closeModal(); await syncPushNow(true); } },
+    { label: "合併兩邊", action: async () => { _mergeRemote(remote); closeModal(); await syncPushNow(true); } },
+    { label: "稍後決定", action: closeModal },
+  ]);
+}
+
+function _mergeRemote(remote) {
+  _applyingRemote = true;
+  try {
+    const owned = Object.assign({}, remote.owned || {});
+    Object.entries(state.owned).forEach(([k, v]) => {
+      owned[k] = Math.max(owned[k] || 0, v);
+    });
+    const buildsById = new Map();
+    (remote.builds || []).forEach(b => b && b.id && buildsById.set(b.id, b));
+    (state.builds || []).forEach(b => b && b.id && buildsById.set(b.id, b)); // 本機覆蓋同 id
+    state.owned = owned;
+    state.builds = [...buildsById.values()];
+    state.updatedAt = Date.now();
+    saveState();
+  } finally {
+    _applyingRemote = false;
+  }
+  render();
+}
+
+async function syncPushNow(silent = false) {
+  if (!Sync.accessToken) return;
+  if (Sync._pushInFlight) { Sync._pushAgain = true; return; }
+  Sync._pushInFlight = true;
+  try {
+    if (!silent) _syncSetStatus("syncing", "上傳中…");
+    else _syncSetStatus("syncing", "上傳中…");
+    const body = { schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [], updatedAt: state.updatedAt || Date.now() };
+    const meta = await _uploadSyncFile(Sync.fileId, body);
+    Sync.fileId = meta.id;
+    Sync.remoteUpdatedAt = body.updatedAt;
+    Sync.lastSyncAt = Date.now();
+    Sync._pendingSave = false;
+    _syncSetStatus("synced", "已上傳");
+  } catch (e) {
+    _syncSetStatus("error", e.message);
+  } finally {
+    Sync._pushInFlight = false;
+    if (Sync._pushAgain) { Sync._pushAgain = false; scheduleSyncPush(); }
+  }
+}
+
+function scheduleSyncPush() {
+  if (!Sync.accessToken) return; // 未登入不推
+  Sync._pendingSave = true;
+  clearTimeout(Sync._pushTimer);
+  Sync._pushTimer = setTimeout(() => syncPushNow(true), SYNC_DEBOUNCE_MS);
+}
+
+// 關頁面時，若還有沒推送的變更，用 keepalive fetch 趕一次最後推送
+// (一般 fetch 在頁面卸載時會被取消，keepalive 則保證送出)
+function _flushSyncOnUnload() {
+  if (!Sync.accessToken || !Sync._pendingSave) return;
+  clearTimeout(Sync._pushTimer);
+  const body = { schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [], updatedAt: state.updatedAt || Date.now() };
+  const metadata = Sync.fileId ? {} : { name: DRIVE_FILE_NAME, parents: ["appDataFolder"] };
+  const boundary = "beyx_" + Math.random().toString(36).slice(2);
+  const payload =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(metadata) + `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
+    JSON.stringify(body) + `\r\n--${boundary}--`;
+  const url = Sync.fileId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${Sync.fileId}?uploadType=multipart`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+  try {
+    fetch(url, {
+      method: Sync.fileId ? "PATCH" : "POST",
+      headers: {
+        Authorization: "Bearer " + Sync.accessToken,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body: payload,
+      keepalive: true,
+    });
+    Sync._pendingSave = false;
+  } catch (e) {}
+}
+window.addEventListener("pagehide", _flushSyncOnUnload);
+// iOS Safari 切到背景時也可能直接被殺，順便在隱藏時也 flush
+window.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") _flushSyncOnUnload();
+});
+
+async function syncPullNow() {
+  if (!Sync.accessToken) return;
+  try {
+    _syncSetStatus("syncing", "下載中…");
+    const file = Sync.fileId ? { id: Sync.fileId } : await _findSyncFile();
+    if (!file) { _syncSetStatus("synced", "雲端沒有資料"); return; }
+    Sync.fileId = file.id;
+    const remote = await _downloadSyncFile(file.id);
+    if (!confirm(`雲端：${Object.keys(remote.owned || {}).length} 個變體 / ${(remote.builds || []).length} 個配置\n更新時間：${remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)"}\n\n用雲端資料覆蓋本機？`)) {
+      _syncSetStatus("signed-in");
+      return;
+    }
+    _applyRemote(remote);
+    _syncSetStatus("synced", "已從雲端拉取");
+    Sync.lastSyncAt = Date.now();
+  } catch (e) {
+    _syncSetStatus("error", e.message);
+  }
+}
+
+function openSyncDialog() { _renderSyncDialog(); }
+function _renderSyncDialog() {
+  const signedIn = !!Sync.accessToken;
+  const lastSyncTxt = Sync.lastSyncAt ? new Date(Sync.lastSyncAt).toLocaleString() : "—";
+  const localTxt = state.updatedAt ? new Date(state.updatedAt).toLocaleString() : "—";
+  const ownedCount = Object.keys(state.owned).length;
+  const buildCount = (state.builds || []).length;
+  const statusBadge = ({
+    "signed-out": '<span style="color:var(--muted);">未登入</span>',
+    "signed-in": '<span style="color:var(--accent);">已登入</span>',
+    "syncing": '<span style="color:var(--accent);">同步中…</span>',
+    "synced": '<span style="color:var(--owned);">已同步</span>',
+    "error": `<span style="color:var(--missing);">錯誤</span>`,
+  })[Sync.status] || Sync.status;
+
+  const body = `
+    <div id="sync-dialog-marker" style="display:none;"></div>
+    <p style="color:var(--muted); margin-top:0; font-size:12px;">
+      把收藏同步到你自己的 Google Drive 應用資料夾。<br>
+      資料只屬於你的 Google 帳號，網站作者看不到也存不到。
+    </p>
+    <div class="sync-row"><span>狀態</span><span>${statusBadge}${Sync.message ? ' · <span style="color:var(--muted);">' + Sync.message + "</span>" : ""}</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${ownedCount} 個變體 / ${buildCount} 個配置</span></div>
+    <div class="sync-row"><span>本機最後修改</span><span>${localTxt}</span></div>
+    <div class="sync-row"><span>最近同步</span><span>${lastSyncTxt}</span></div>
+    ${!GOOGLE_CLIENT_ID ? '<p style="color:var(--warn); font-size:12px; margin:8px 0 0;">⚠️ 尚未設定 Client ID。請在 template.html 找到 <code>GOOGLE_CLIENT_ID</code> 填入。</p>' : ""}
+  `;
+  const actions = [];
+  if (!signedIn) {
+    actions.push({ label: "🔐 用 Google 登入", primary: true, action: syncSignIn });
+  } else {
+    actions.push({ label: "⬆ 立即上傳", primary: true, action: () => syncPushNow(false) });
+    actions.push({ label: "⬇ 從雲端拉取", action: syncPullNow });
+    actions.push({ label: "登出", action: syncSignOut });
+  }
+  actions.push({ label: "關閉", action: closeModal });
+  showModal("雲端同步", body, actions);
+}
+
+// 啟動: 如果之前曾登入過且 token 還在有效期內，直接用快取的 token
+// (避免每次重整都重跑 OAuth 跳 popup)
+async function syncBootstrap() {
+  if (!GOOGLE_CLIENT_ID) { _syncSetStatus("signed-out"); return; }
+  if (localStorage.getItem(SYNC_FLAG_KEY) !== "1") { _syncSetStatus("signed-out"); return; }
+  const cached = _loadCachedToken();
+  if (cached) {
+    Sync.accessToken = cached;
+    _syncSetStatus("signed-in");
+    syncReconcile(); // 不 await，讓畫面先回應
+    return;
+  }
+  // 沒有有效快取 → 嘗試靜默重連 (這可能會閃 popup，所以只在快取真的過期時做)
+  try {
+    _syncSetStatus("syncing", "重新連線中…");
+    await _waitForGis(8000);
+    await _requestToken(false);
+    _syncSetStatus("signed-in");
+    await syncReconcile();
+  } catch (e) {
+    // 靜默失敗就還原成「未登入」狀態，等使用者主動點
+    localStorage.removeItem(SYNC_FLAG_KEY);
+    _syncSetStatus("signed-out", "請重新登入");
+  }
+}
+
 // ============================================================
 // 啟動
 // ============================================================
 render();
+syncBootstrap();
 </script>
 </body>
 </html>
