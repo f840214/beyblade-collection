@@ -2247,12 +2247,28 @@ const SYNC_TOKEN_KEY = "beyx_sync_token"; // 快取 access token (1 小時內可
 const SYNC_DEBOUNCE_MS = 3000;
 
 function _saveCachedToken(token, expiresIn) {
+  const ttl = Math.max(0, (Number(expiresIn) || 3600) - 60); // 留 60 秒安全餘裕
   try {
     localStorage.setItem(SYNC_TOKEN_KEY, JSON.stringify({
       token,
-      expiresAt: Date.now() + Math.max(0, (Number(expiresIn) || 3600) - 60) * 1000, // 留 60 秒安全餘裕
+      expiresAt: Date.now() + ttl * 1000,
     }));
   } catch (e) {}
+  _scheduleTokenRefresh(ttl);
+}
+// 在 token 過期前 5 分鐘背景靜默續期，這樣使用者完全不會看到 popup
+let _refreshTimer = null;
+function _scheduleTokenRefresh(ttlSeconds) {
+  clearTimeout(_refreshTimer);
+  const refreshIn = Math.max(30, ttlSeconds - 300) * 1000; // 過期前 5 分鐘
+  _refreshTimer = setTimeout(async () => {
+    if (!localStorage.getItem(SYNC_FLAG_KEY)) return;
+    try { await _requestToken(false); }
+    catch (e) {
+      // 靜默失敗就讓下次互動再處理，不打擾使用者
+      _clearCachedToken();
+    }
+  }, refreshIn);
 }
 function _loadCachedToken() {
   try {
@@ -2635,6 +2651,11 @@ async function syncBootstrap() {
   if (cached) {
     Sync.accessToken = cached;
     _syncSetStatus("signed-in");
+    // 排定下次背景續期 (依快取剩餘時間)
+    try {
+      const c = JSON.parse(localStorage.getItem(SYNC_TOKEN_KEY) || "{}");
+      if (c.expiresAt) _scheduleTokenRefresh(Math.max(30, Math.floor((c.expiresAt - Date.now()) / 1000)));
+    } catch (e) {}
     syncReconcile(); // 不 await，讓畫面先回應
     return;
   }
