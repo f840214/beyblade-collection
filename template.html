@@ -762,14 +762,16 @@ let mineView = "detail"; // detail | table
 
 // 情報: 從自己的 lineup-scraped.json 讀取（由 GitHub Actions 每日爬取 Takara Tomy）
 const NEWS_URL = "data/lineup-scraped.json";
-const NEWS_CACHE_KEY = "beyx-news-cache";
+const NEWS_CACHE_KEY = "beyx-lineup-cache";
 const NEWS_TTL_MS = 30 * 60 * 1000; // 30 分鐘
 let newsState = { status: "idle", data: null, error: null, fetchedAt: 0 };
 function loadNewsCache() {
   try {
     const c = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || "null");
-    if (c && c.data && c.fetchedAt) { newsState = { status: "ok", data: c.data, error: null, fetchedAt: c.fetchedAt }; }
+    if (c && c.data && c.data.products && c.fetchedAt) { newsState = { status: "ok", data: c.data, error: null, fetchedAt: c.fetchedAt }; }
   } catch (e) {}
+  // 清除舊格式快取
+  localStorage.removeItem("beyx-news-cache");
 }
 async function fetchNews(force = false) {
   if (!force && newsState.status === "ok" && Date.now() - newsState.fetchedAt < NEWS_TTL_MS) return;
