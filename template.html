@@ -857,7 +857,7 @@ function buildFilters() {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
     const seriesIcon = s => {
       const icons = { BX: 1, CX: 1, UX: 1 };
-      if (icons[s]) return `<img src="https://go-shoot.github.io/x/img/lines.svg#${s}" alt="${s}" style="width:20px;height:20px;vertical-align:middle;">`;
+      if (icons[s]) return `<img src="img/lines.svg#${s}" alt="${s}" style="width:20px;height:20px;vertical-align:middle;">`;
       return s;
     };
     wrap.innerHTML = `
