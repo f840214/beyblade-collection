@@ -79,6 +79,22 @@ node build.js
 
 排行榜（`tier.json`）是手動維護，跟資料庫無關。
 
+## 自動爬蟲（GitHub Actions）
+
+每天台灣時間 17:00，GitHub Actions 會自動爬取 [Takara Tomy Beyblade X 商品頁](https://beyblade.takaratomy.co.jp/beyblade-x/lineup/)，更新 `data/lineup-scraped.json`。
+
+- **用途**：偵測新商品、更新情報頁資料
+- **排程**：`.github/workflows/scrape-lineup.yml`，cron `0 9 * * *`（UTC 09:00 = 台灣 17:00）
+- **手動觸發**：到 repo 的 [Actions 頁面](https://github.com/f840214/beyblade-collection/actions) → 選 `Scrape Takara Tomy Lineup` → `Run workflow`
+- **偵測到新商品時**：自動 commit + 開 Issue 通知
+
+### 關閉爬蟲
+
+兩種方式：
+
+1. **暫時停用**：到 repo 的 [Actions 頁面](https://github.com/f840214/beyblade-collection/actions) → 選 `Scrape Takara Tomy Lineup` → 右上角 `⋯` → `Disable workflow`
+2. **永久移除**：刪除 `.github/workflows/scrape-lineup.yml` 檔案並 commit
+
 ## 資料來源
 
 零件、商品資料整理自 [go-shoot.github.io/x](https://go-shoot.github.io/x/)（非官方 Beyblade X 中文資訊站）。本工具僅供個人收藏管理使用。
