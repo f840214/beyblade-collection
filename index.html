@@ -391,7 +391,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-20">v0.69</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-20">v0.71</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button id="sync-btn" onclick="openSyncDialog()" title="同步到 Google Drive"><svg viewBox="0 0 48 48" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" aria-hidden="true"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg><span id="sync-btn-label">同步</span></button>
@@ -760,10 +760,10 @@ let filterOpts = {
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
 let mineView = "detail"; // detail | table
 
-// 情報: 從上游 fetch 的 -update.json，cache 在 localStorage
-const NEWS_URL = "https://go-shoot.github.io/x/db/-update.json";
+// 情報: 從自己的 lineup-scraped.json 讀取（由 GitHub Actions 每日爬取 Takara Tomy）
+const NEWS_URL = "data/lineup-scraped.json";
 const NEWS_CACHE_KEY = "beyx-news-cache";
-const NEWS_TTL_MS = 60 * 60 * 1000; // 1 小時
+const NEWS_TTL_MS = 30 * 60 * 1000; // 30 分鐘
 let newsState = { status: "idle", data: null, error: null, fetchedAt: 0 };
 function loadNewsCache() {
   try {
@@ -821,10 +821,8 @@ function buildFilters() {
     return;
   }
   if (activeTab === "news") {
-    const updated = newsState.fetchedAt ? new Date(newsState.fetchedAt).toLocaleString() : "—";
-    wrap.innerHTML = `<span style="color: var(--muted); font-size: 12px;">上次更新 ${updated}</span>
-      <button onclick="fetchNews(true)" style="margin-left:auto;">↻ 重新整理</button>`;
-    searchEl.placeholder = "搜尋情報…";
+    wrap.innerHTML = `<button onclick="fetchNews(true)" style="margin-left:auto;">↻ 重新整理</button>`;
+    searchEl.placeholder = "搜尋商品代號 / 名稱…";
     return;
   }
   if (activeTab === "builds") {
@@ -1499,26 +1497,12 @@ function goBack() {
 // ============================================================
 // 情報 (news)
 // ============================================================
-function newsFiles(d) {
-  // 從 -update.json 過濾出檔案時間戳 (排除 news)
-  return Object.entries(d || {}).filter(([k]) => k !== "news");
+function newsProducts(d) {
+  return (d && d.products) || [];
 }
-function newsItems(d) {
-  // 把 news 攤平成 [{date, item}, ...]; 新到舊
-  const news = (d && d.news) || {};
-  const arr = [];
-  Object.keys(news).sort().reverse().forEach(date => {
-    (news[date] || []).forEach(item => arr.push({ date, item }));
-  });
-  return arr;
-}
-function newsItemMatches(entry, q) {
+function newsProductMatches(p, q) {
   if (!q) return true;
-  const i = entry.item;
-  const haystack = [
-    i.code, i.bey,
-    ...(i.name || []), ...(i.ver || []), ...(i.desc || [])
-  ].filter(Boolean).join(" ").toLowerCase();
+  const haystack = [p.code, p.nameJp, p.category, p.series, p.release, p.price].filter(Boolean).join(" ").toLowerCase();
   return haystack.includes(q);
 }
 function renderNewsSidebar(q) {
@@ -1526,60 +1510,57 @@ function renderNewsSidebar(q) {
   if (newsState.status === "error" && !newsState.data) return `<div class="empty" style="padding:20px;">載入失敗<br><span style="color:var(--muted); font-size:11px;">${newsState.error || ""}</span></div>`;
   if (!newsState.data) return `<div class="empty" style="padding:20px;">尚無資料</div>`;
 
-  const dateGroups = {};
-  newsItems(newsState.data).filter(e => newsItemMatches(e, q)).forEach(e => {
-    (dateGroups[e.date] = dateGroups[e.date] || []).push(e.item);
+  const products = newsProducts(newsState.data).filter(p => newsProductMatches(p, q));
+  // Group by release month
+  const groups = {};
+  products.forEach(p => {
+    const month = p.release ? p.release.replace(/\.\d+$/, "") : "未定";
+    (groups[month] = groups[month] || []).push(p);
   });
-  const dates = Object.keys(dateGroups).sort().reverse();
-  if (!dates.length) return `<div class="empty" style="padding:20px;">沒有符合的條目</div>`;
+  const months = Object.keys(groups).sort().reverse();
+  if (!months.length) return `<div class="empty" style="padding:20px;">沒有符合的條目</div>`;
 
   return `<div class="group">
-    <div class="group-head"><span>日期</span><span class="count">${dates.length}</span></div>
+    <div class="group-head"><span>發售月份</span><span class="count">${months.length}</span></div>
     <div class="group-body">
-      ${dates.map(d => `<div class="item" onclick="document.getElementById('news-date-${d}').scrollIntoView({behavior:'smooth', block:'start'})">
+      ${months.map(m => `<div class="item" onclick="document.getElementById('news-month-${m.replace(/\./g,"-")}').scrollIntoView({behavior:'smooth', block:'start'})">
         <span class="check">●</span>
-        <span class="name">${d}</span>
-        <span class="qty">${dateGroups[d].length}</span>
+        <span class="name">${m}</span>
+        <span class="qty">${groups[m].length}</span>
       </div>`).join("")}
     </div>
   </div>`;
 }
 
-function newsTypePill(type) {
-  if (!type) return "";
-  const map = { att: "att", def: "def", sta: "sta", bal: "bal" };
-  const cls = map[type] || "";
-  return `<span class="pill ${cls}">${type}</span>`;
+function newsAttrPill(attr) {
+  if (!attr) return "";
+  return `<span class="pill ${attr}">${attr}</span>`;
 }
-// 從 news code 抽商品代號 (e.g. "CX-17 random booster" → "CX-17"; "BXG-61" → "BXG-61")
-function newsExtractProductId(code) {
-  if (!code) return null;
-  const m = code.match(/^([A-Z]+)-?(\d+)/);
-  return m ? `${m[1]}-${m[2]}` : null;
+function newsTypeName(type) {
+  const map = { starter: "スターター", booster: "ブースター", random_booster: "RB", set: "セット", tool: "ツール", other: "" };
+  return map[type] || type || "";
 }
-function renderNewsItem(entry) {
-  const i = entry.item;
-  const title = (i.name && (i.name[1] || i.name[0])) || i.bey || i.code || "(未命名)";
-  const subTitle = i.name && i.name[0] && i.name[0] !== title ? i.name[0] : (i.ver && (i.ver[1] || i.ver[0])) || "";
-  const verJp = i.ver && i.ver[0] && i.ver[1] !== subTitle ? i.ver[0] : "";
-  const imgs = (i.imgs || []).filter(Boolean);
-  const desc = (i.desc || []).filter(Boolean);
-  // 沒附圖時，用 news code 推商品代號去找本地 products/ 圖
-  const fallbackPid = imgs.length ? null : newsExtractProductId(i.code);
-  return `<div class="card news-card">
+function renderNewsProduct(p) {
+  const title = p.nameJp || p.code;
+  const inCol = p.inCollection;
+  const pid = p.code.replace(/-00-.*/, m => m); // keep full code for image
+  // Try to find matching product ID for image
+  const imgPid = p.code.match(/^([A-Z]+)-(\d+)$/) ? p.code : null;
+  return `<div class="card news-card" style="${inCol ? "border-color: rgba(46,204,113,0.3);" : ""}">
     <div class="news-head">
-      <span class="news-code">${i.code || ""}</span>
-      ${newsTypePill(i.type)}
+      <span class="news-code">${p.code}</span>
+      ${newsAttrPill(p.attr)}
+      <span class="pill" style="margin-left:2px;">${newsTypeName(p.type)}</span>
+      ${inCol ? '<span class="pill owned" style="margin-left:auto;">已收錄</span>' : ""}
     </div>
     <h3 class="news-title">${title}</h3>
-    ${subTitle ? `<div class="sub">${subTitle}${verJp ? ` ・ ${verJp}` : ""}</div>` : ""}
-    ${i.bey && i.bey !== title ? `<div class="sub" style="font-family:monospace;">${i.bey}</div>` : ""}
-    ${imgs.length ? `<div class="news-imgs">
-      ${imgs.map(u => `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'"></a>`).join("")}
-    </div>` : fallbackPid ? `<div class="news-imgs">
-      <img src="${productImageSrc(fallbackPid)}" loading="lazy" alt="${fallbackPid}" onerror="this.parentElement.style.display='none'">
+    ${p.category && p.category !== newsTypeName(p.type) ? `<div class="sub">${p.category}</div>` : ""}
+    <div class="sub">${[p.price, p.release ? p.release + " 發售" : null].filter(Boolean).join(" · ")}</div>
+    ${imgPid ? `<div class="news-imgs">
+      <img src="${productImageSrc(imgPid)}" loading="lazy" alt="${p.code}" onerror="this.parentElement.style.display='none'">
+    </div>` : p.img ? `<div class="news-imgs">
+      <img src="https://beyblade.takaratomy.co.jp/beyblade-x/lineup/${p.img}" loading="lazy" alt="${p.code}" referrerpolicy="no-referrer" onerror="this.parentElement.style.display='none'">
     </div>` : ""}
-    ${desc.length ? `<ul class="news-desc">${desc.map(d => `<li>${d}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
 function renderNews() {
@@ -1588,26 +1569,25 @@ function renderNews() {
   if (!newsState.data) return `<div class="empty">尚無資料</div>`;
 
   const q = document.getElementById("search").value.trim().toLowerCase();
-  const grouped = {};
-  newsItems(newsState.data).filter(e => newsItemMatches(e, q)).forEach(e => {
-    (grouped[e.date] = grouped[e.date] || []).push(e);
-  });
-  const dates = Object.keys(grouped).sort().reverse();
-  if (!dates.length) return `<div class="empty">沒有符合條件的情報</div>`;
+  const products = newsProducts(newsState.data).filter(p => newsProductMatches(p, q));
 
-  const files = newsFiles(newsState.data);
-  const filesBlock = files.length ? `<details class="card" style="margin-bottom:14px;"><summary style="cursor:pointer; color:var(--muted);">資料檔最後更新時間（${files.length} 項）</summary>
-    <div style="margin-top:8px; font-size:12px;">
-      ${files.map(([k, v]) => `<div class="row"><span class="k" style="width:160px;">${k}</span><span class="v" style="font-family:monospace;">${v}</span></div>`).join("")}
-    </div></details>` : "";
+  // Group by release month
+  const grouped = {};
+  products.forEach(p => {
+    const month = p.release ? p.release.replace(/\.\d+$/, "") : "未定";
+    (grouped[month] = grouped[month] || []).push(p);
+  });
+  const months = Object.keys(grouped).sort().reverse();
+  if (!months.length) return `<div class="empty">沒有符合條件的情報</div>`;
+
+  const scrapedAt = newsState.data.scrapedAt ? new Date(newsState.data.scrapedAt).toLocaleString() : "—";
 
   return `<div>
-    <h2>最新情報</h2>
-    <div class="sub">共 ${newsItems(newsState.data).length} 則</div>
-    ${filesBlock}
-    ${dates.map(d => `<div id="news-date-${d}" class="news-date-section">
-      <h3 class="news-date-head">${d}</h3>
-      ${grouped[d].map(renderNewsItem).join("")}
+    <h2>商品一覽</h2>
+    <div class="sub">共 ${products.length} 項 · 資料來源：Takara Tomy · 爬取時間：${scrapedAt}</div>
+    ${months.map(m => `<div id="news-month-${m.replace(/\./g,"-")}" class="news-date-section">
+      <h3 class="news-date-head">${m}</h3>
+      ${grouped[m].map(renderNewsProduct).join("")}
     </div>`).join("")}
   </div>`;
 }
