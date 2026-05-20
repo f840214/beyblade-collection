@@ -84,7 +84,8 @@
     padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
   }
   /* 防止 iOS Safari 在點擊 input 時自動放大畫面 */
-  input, textarea, select { font-size: 16px; }
+  input, textarea, select { font-size: 16px; outline: none; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
   button:hover { background: #2a3040; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #001833; }
   button.primary:hover { background: #6cb3ff; }
@@ -134,12 +135,13 @@
     width: 100%; padding: 7px 10px; background: var(--bg);
     border: 1px solid var(--border); color: var(--text); border-radius: 6px;
   }
-  .filters { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; }
+  .filters { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+  .filter-row { display: flex; gap: 6px; align-items: center; }
   .filter-chip {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 10px; border-radius: 14px; cursor: pointer;
+    padding: 6px 14px; border-radius: 18px; cursor: pointer;
     border: 1.5px solid var(--border); background: transparent;
-    font-size: 12px; color: var(--muted); transition: all 0.15s;
+    font-size: 14px; color: var(--muted); transition: all 0.15s;
     user-select: none; -webkit-user-select: none;
   }
   .filter-chip:not(.active) { opacity: 0.5; }
@@ -149,12 +151,12 @@
   .filter-chip.active[data-f="wishlist"] { border-color: var(--warn); background: rgba(217,119,6,0.12); color: var(--warn); }
   .series-chip {
     display: inline-flex; align-items: center; gap: 3px;
-    padding: 3px 10px; border-radius: 14px; cursor: pointer;
+    padding: 5px 12px; border-radius: 18px; cursor: pointer;
     border: 1.5px solid var(--border); background: transparent;
-    font-size: 12px; color: var(--muted); transition: all 0.15s;
+    font-size: 13px; color: var(--muted); transition: all 0.15s;
     user-select: none; -webkit-user-select: none;
   }
-  .series-chip img { width: 18px; height: 18px; }
+  .series-chip img { width: 22px; height: 22px; }
   .series-chip.active { color: var(--text); }
   .series-chip.active[data-s="BX"] { border-color: #71bce9; background: rgba(113,188,233,0.12); }
   .series-chip.active[data-s="CX"] { border-color: #f42597; background: rgba(244,37,151,0.12); }
@@ -166,8 +168,8 @@
     margin-left: auto; flex-shrink: 0;
   }
   .view-toggle button {
-    padding: 3px 8px; font-size: 14px; border-radius: 4px;
-    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 10px; font-size: 15px; border-radius: 8px;
+    background: transparent; border: 1.5px solid var(--border); color: var(--muted);
     cursor: pointer; line-height: 1;
   }
   .view-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -194,7 +196,7 @@
   .product-card .pc-badge.partial { background: var(--warn); color: #1a1a2e; }
   .product-card .pc-type { color: var(--muted); font-size: 11px; }
   .product-card .pc-name { font-size: 12px; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .product-card .pc-coats { display: flex; gap: 4px; flex-wrap: wrap; }
+  .product-card .pc-tags { display: flex; gap: 4px; flex-wrap: wrap; }
   .product-card .pc-coat {
     display: inline-flex; align-items: center; gap: 3px;
     font-size: 10px; color: var(--muted); padding: 1px 6px;
@@ -403,6 +405,44 @@
   }
   .source-list .src.owned { background: rgba(46,204,113,0.18); border-color: var(--owned); color: var(--owned); }
   .source-list .src:hover { background: #2a3040; }
+
+  .mine-sec-head {
+    margin: 32px 0 12px; font-size: 16px; font-weight: 600;
+    padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .mine-sec-head:first-child { margin-top: 0; }
+  .mine-part-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;
+    margin-bottom: 8px;
+  }
+  .mine-part-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px; cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .mine-part-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .mine-part-img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; border-radius: 6px; background: var(--panel2); }
+  .mine-part-info { min-width: 0; flex: 1; }
+  .mine-part-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mine-part-code { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .mine-part-src { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .mine-prod-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .mine-prod-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .mine-prod-row:hover { border-color: var(--accent); }
+  .mine-prod-row.done { border-color: rgba(46,204,113,0.3); }
+  .mine-prod-img { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; border-radius: 6px; }
+  .mine-prod-info { flex: 1; min-width: 0; }
+  .mine-prod-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mine-prod-id { color: var(--accent2); }
+  .mine-prod-meta { font-size: 11px; color: var(--muted); }
+  .mine-prod-bar-wrap { width: 50px; height: 4px; background: var(--panel2); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .mine-prod-bar { height: 100%; background: var(--owned); border-radius: 2px; }
+  .mine-prod-done { color: var(--owned); font-weight: 700; font-size: 14px; flex-shrink: 0; }
 
   .progress {
     height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden;
@@ -820,6 +860,7 @@ function ownedParts() {
 // 渲染
 // ============================================================
 let activeTab = "products";
+let prevTab = null;
 let selected = null; // { type: "product"|"blade"|"ratchet"|"bit", id }
 let filterOpts = {
   ownedOnly: false,
@@ -829,7 +870,7 @@ let filterOpts = {
 };
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
 let mineView = "detail"; // detail | table
-let productView = "list"; // list | grid
+let productView = "grid"; // list | grid
 
 // 情報: 從自己的 lineup-scraped.json 讀取（由 GitHub Actions 每日爬取 Takara Tomy）
 const NEWS_URL = "data/lineup-scraped.json";
@@ -890,7 +931,8 @@ function toggleGroup(key) {
 
 function setMineView(v) { mineView = v; render(); }
 
-function switchTab(tab) {
+function switchTab(tab, fromTab) {
+  prevTab = fromTab || null;
   activeTab = tab;
   document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === tab));
   selected = null;
@@ -932,19 +974,25 @@ function buildFilters() {
       return s;
     };
     wrap.innerHTML = `
+      <div class="filter-row">
         <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
         <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
         <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
+      </div>
+      <div class="filter-row">
         ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
         <span class="view-toggle">
           <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()" title="列表">☰</button>
           <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()" title="卡片">▦</button>
         </span>
+      </div>
     `;
   } else {
     wrap.innerHTML = `
-      <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly)filterOpts.missingOnly=false; render()">✓ 擁有</span>
-      <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly)filterOpts.ownedOnly=false; render()">✗ 缺少</span>
+      <div class="filter-row">
+        <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly)filterOpts.missingOnly=false; render()">✓ 擁有</span>
+        <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly)filterOpts.ownedOnly=false; render()">✗ 缺少</span>
+      </div>
     `;
   }
 }
@@ -1022,10 +1070,10 @@ function renderMineSidebar() {
   const op = ownedParts();
   const ownedProdCount = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id))).length;
   const sections = [
-    { key: "products", label: "🌀 陀螺戰士", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
-    { key: "blade",    label: "⚔️ 戰刃", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
-    { key: "ratchet",  label: "⚙️ 固鎖", n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
-    { key: "bit",      label: "🔩 軸",   n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
+    { key: "products", label: "陀螺商品", n: ownedProdCount, total: PRODUCT_LIST.length, anchor: "mine-products" },
+    { key: "blade",    label: "戰刃 Blade", n: op.blades.size,   total: ALL_BLADES.size,   anchor: "mine-blade" },
+    { key: "ratchet",  label: "固鎖 Ratchet", n: op.ratchets.size, total: ALL_RATCHETS.size, anchor: "mine-ratchet" },
+    { key: "bit",      label: "軸 Bit",   n: op.bits.size,     total: ALL_BITS.size,     anchor: "mine-bit" },
   ];
   return `<div class="group"><div class="group-body">` +
     sections.map(s => `<div class="item ${s.n > 0 ? "owned" : ""}" onclick="document.getElementById('${s.anchor}').scrollIntoView({behavior:'smooth', block:'start'})">
@@ -1236,7 +1284,7 @@ function tierJumpToPart(code, kind) {
   if (!code) return;
   const set = kind === "bit" ? ALL_BITS : ALL_RATCHETS;
   if (!set.has(code)) return;
-  switchTab("parts");
+  switchTab("parts", "tier");
   select(kind, code);
 }
 
@@ -1244,11 +1292,11 @@ function tierJumpToBlade(kind, id) {
   if (!id) return;
   if (kind === "blade") {
     if (!ALL_BLADES.has(id)) return;
-    switchTab("parts");
+    switchTab("parts", "tier");
     select("blade", id);
   } else if (kind === "product") {
     if (!PRODUCTS[id]) return;
-    switchTab("products");
+    switchTab("products", "tier");
     select("product", id);
   }
 }
@@ -1347,6 +1395,15 @@ function renderProductGrid(q) {
       const coatHtml = coats.length ? coats.map(c =>
         `<span class="pc-coat" style="--coat:${c}"><span class="pc-coat-dot" style="background:${c}"></span>${coatName(c)}</span>`
       ).join("") : "";
+      const attrSet = new Set();
+      p.variants.forEach(v => {
+        if (!isEmptyPart(v.blade)) {
+          const info = bladeInfo(v.blade);
+          if (info.attr) info.attr.forEach(a => { if (["att","def","sta","bal"].includes(a)) attrSet.add(a); });
+        }
+      });
+      const ATTR_LABEL = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
+      const attrHtml = [...attrSet].map(a => `<span class="pill ${a}">${ATTR_LABEL[a]}</span>`).join("");
       cards.push(`<div class="product-card ${cls}" onclick="select('product','${p.id}')">
         <div class="pc-header">
           <span class="pc-code">${p.id}</span>
@@ -1354,7 +1411,7 @@ function renderProductGrid(q) {
         </div>
         <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
         ${nameStr ? `<span class="pc-name">${nameStr}</span>` : ""}
-        ${coatHtml ? `<div class="pc-coats">${coatHtml}</div>` : ""}
+        ${attrHtml || coatHtml ? `<div class="pc-tags">${attrHtml}${coatHtml}</div>` : ""}
         <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.outerHTML='<div class=\\'pc-noimg\\'>暫無圖片</div>'">
         <div class="pc-foot">
           <span>${ownedV}/${total}</span>
@@ -1556,13 +1613,13 @@ function renderBuildEditor(id) {
       <input type="text" placeholder="配置名稱 (例: 蒼龍爆刃)" value="${(b.name || '').replace(/"/g, '&quot;')}"
              oninput="updateBuildField('${id}','name', this.value)"
              style="flex:1; min-width:160px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
-      <button onclick="duplicateBuild('${id}')">🔁 複製</button>
-      <button class="danger" onclick="deleteBuild('${id}')">🗑 刪除</button>
+      <button onclick="duplicateBuild('${id}')">複製</button>
+      <button class="danger" onclick="deleteBuild('${id}')">刪除</button>
     </div>
     <div style="margin-bottom:12px;">${statusPill}</div>
-    ${slot("blade", "⚔️ 戰刃", b.blade, bladeInfo, (c) => bladeName(c), op.blades)}
-    ${slot("ratchet", "⚙️ 固鎖", b.ratchet, ratchetInfo, () => "", op.ratchets)}
-    ${slot("bit", "🔩 軸", b.bit, bitInfo,
+    ${slot("blade", "戰刃 Blade", b.blade, bladeInfo, (c) => bladeName(c), op.blades)}
+    ${slot("ratchet", "固鎖 Ratchet", b.ratchet, ratchetInfo, () => "", op.ratchets)}
+    ${slot("bit", "軸 Bit", b.bit, bitInfo,
       (c, i) => preferredChi(i && i.names && i.names.chi), op.bits)}
     <textarea placeholder="備註 (選填，例: 攻擊型、台場限定…)"
               oninput="updateBuildField('${id}','note', this.value)"
@@ -1650,9 +1707,22 @@ function pickPart(code) {
 }
 
 function goBack() {
-  if (activeTab === "mine") { switchTab("products"); return; }
-  if (activeTab === "tier") { switchTab("products"); return; }
-  if (activeTab === "news") { switchTab("products"); return; }
+  // 如果有來源 tab，直接回去（跳過中間列表）
+  if (prevTab && prevTab !== activeTab) {
+    const backTo = prevTab;
+    prevTab = null;
+    selected = null;
+    switchTab(backTo);
+    return;
+  }
+  // 如果有選中項目，取消選中（回到當前 tab 列表）
+  if (selected) {
+    selected = null;
+    render();
+    return;
+  }
+  // 預設：全螢幕 tab 回到商品
+  if (["mine","tier","news"].includes(activeTab)) { switchTab("products"); return; }
   selected = null;
   render();
 }
@@ -1760,40 +1830,33 @@ function renderCollection() {
   const op = ownedParts();
   const ownedProducts = PRODUCT_LIST.filter(p => p.variants.some(v => isOwned(v.id)));
 
-  // 商品段
-  const productsHtml = ownedProducts.length === 0
+  // 商品段 — 緊湊清單，快速總覽
+  const filteredProds = ownedProducts.filter(p => !q || codeMatches(p.id, q) || p.variants.some(v => isOwned(v.id) && variantMatches(v, q)));
+  const productsHtml = filteredProds.length === 0
     ? `<div class="empty" style="padding: 20px;">還沒有任何擁有的商品</div>`
-    : ownedProducts
-        .filter(p => !q || codeMatches(p.id, q) || p.variants.some(v => isOwned(v.id) && variantMatches(v, q)))
-        .map(p => {
-          const ownedVars = p.variants.filter(v => isOwned(v.id));
-          return `<div class="card" style="cursor:pointer" onclick="switchTab('products'); select('product','${p.id}')">
-            <div style="display:flex; align-items:baseline; gap:8px;">
-              <h3 style="margin:0; color: var(--text);">${productTypeName(p.type)}</h3>
-              <span style="color:var(--muted); font-size:12px; font-family:monospace;">${p.id}</span>
-              <span class="pill owned" style="margin-left:auto;">${ownedVars.length}/${p.variants.length}</span>
-            </div>
-            <div style="margin-top:6px; font-size:12px;">
-              ${ownedVars.map(v => {
-                const bChi = isEmptyPart(v.blade) ? "—" : (bladeName(v.blade) || v.blade);
-                const rDisp = isEmptyPart(v.ratchet) ? "—" : v.ratchet;
-                const bitC = isEmptyPart(v.bit) ? "—" : (bitName(v.bit) || v.bit);
-                const codeStr = [isEmptyPart(v.blade)?"—":v.blade, rDisp, isEmptyPart(v.bit)?"—":v.bit].join(" ");
-                const qty = ownedQty(v.id);
-                return `<div style="margin-bottom:4px;">
-                  <div>${bChi} · ${rDisp} · ${bitC}${qty > 1 ? ` <span style="color:var(--muted)">×${qty}</span>` : ""}</div>
-                  <div style="color:var(--muted); font-size:11px; font-family:monospace;">${codeStr}</div>
-                </div>`;
-              }).join("")}
-            </div>
-          </div>`;
-        }).join("");
+    : filteredProds.map(p => {
+        const ownedV = p.variants.filter(v => isOwned(v.id)).length;
+        const total = p.variants.length;
+        const pct = total > 0 ? (ownedV / total * 100) : 0;
+        const blades = [...new Set(p.variants.filter(v => isOwned(v.id)).map(v => isEmptyPart(v.blade) ? null : bladeName(v.blade)).filter(Boolean))];
+        const nameStr = blades.length === 0 ? "" : blades.length > 3 ? blades.slice(0,3).join("、") + ` +${blades.length-3}` : blades.join("、");
+        const done = ownedV === total;
+        return `<div class="mine-prod-row ${done ? "done" : ""}" onclick="switchTab('products','mine'); select('product','${p.id}')">
+          <img class="mine-prod-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.style.display='none'">
+          <div class="mine-prod-info">
+            <div class="mine-prod-title"><span class="mine-prod-id">${p.id}</span> ${nameStr}</div>
+            <div class="mine-prod-meta">${productTypeName(p.type)} · ${ownedV}/${total}</div>
+          </div>
+          <div class="mine-prod-bar-wrap"><div class="mine-prod-bar" style="width:${pct}%"></div></div>
+          ${done ? `<span class="mine-prod-done">✓</span>` : ""}
+        </div>`;
+      }).join("");
 
-  // 零件段
-  const partSection = (title, anchor, ownedSet, info, nameFn) => {
+  // 零件段 — 網格卡片 + 圖片
+  const partSection = (title, anchor, type, ownedSet, info, nameFn, imgFn) => {
     const items = [...ownedSet].sort();
     if (items.length === 0) {
-      return `<h2 id="${anchor}" style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">0</span></h2>
+      return `<h2 id="${anchor}" class="mine-sec-head">${title} <span class="pill" style="font-size:12px;">0</span></h2>
         <div class="empty" style="padding: 20px;">還沒有任何擁有的零件</div>`;
     }
     const filtered = q ? items.filter(c => {
@@ -1802,45 +1865,47 @@ function renderCollection() {
       const eng = inf.names ? inf.names.eng || "" : "";
       return codeMatches(c, q) || codeMatches(eng, q) || chiMatches(chi, q);
     }) : items;
-    return `<h2 id="${anchor}" style="margin-top:24px;">${title} <span class="pill" style="font-size:12px;">${items.length}</span></h2>` +
-      filtered.map(code => {
+    return `<h2 id="${anchor}" class="mine-sec-head">${title} <span class="pill" style="font-size:12px;">${items.length}</span></h2>
+      <div class="mine-part-grid">${filtered.map(code => {
         const inf = info(code);
-        const sources = (PART_SOURCES[anchor.replace("mine-","")][code] || []);
-        const ownedSources = sources.filter(v => isOwned(v.id));
         const display = nameFn(code, inf);
         const headPrimary = display || code;
         const headSub = display ? code : "";
-        return `<div class="card">
-          <div style="display:flex; align-items:baseline; gap:8px;">
-            <h3 style="margin:0; color:var(--text);">${headPrimary}</h3>
-            ${headSub ? `<span style="color: var(--muted); font-size:12px; font-family:monospace;">${headSub}</span>` : ""}
-          </div>
-          <div style="margin-top:8px;">
-            <div style="color: var(--muted); font-size:11px; margin-bottom:4px;">來自（已擁有 ${ownedSources.length} / ${sources.length}）：</div>
-            <div class="source-list">
-              ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="switchTab('products'); select('product','${v.productId}')" title="${productTypeName(PRODUCTS[v.productId].type)}">${v.productId} · ${variantDisplayChi(v)}</span>`).join("")}
-            </div>
+        const attr = inf.attr || [];
+        const ATTR_L = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
+        const pills = attr.filter(a => ATTR_L[a]).map(a => `<span class="pill ${a}">${ATTR_L[a]}</span>`).join("");
+        const imgSrc = imgFn ? imgFn(code) : "";
+        const sources = (PART_SOURCES[type][code] || []);
+        const ownedSources = sources.filter(v => isOwned(v.id));
+        return `<div class="mine-part-card" onclick="switchTab('parts','mine'); select('${type}','${code}')">
+          ${imgSrc ? `<img class="mine-part-img" src="${imgSrc}" alt="${code}" loading="lazy" onerror="this.style.display='none'">` : ""}
+          <div class="mine-part-info">
+            <div class="mine-part-name">${headPrimary}</div>
+            ${headSub ? `<div class="mine-part-code">${headSub}</div>` : ""}
+            ${pills ? `<div style="margin-top:2px;">${pills}</div>` : ""}
+            <div class="mine-part-src">${ownedSources.length}/${sources.length} 來源</div>
           </div>
         </div>`;
-      }).join("");
+      }).join("")}</div>`;
   };
 
-  const bladeSec = partSection("⚔️ 戰刃", "mine-blade", op.blades, bladeInfo,
-    (c) => bladeName(c));
-  const ratchetSec = partSection("⚙️ 固鎖", "mine-ratchet", op.ratchets, ratchetInfo, () => "");
-  const bitSec = partSection("🔩 軸", "mine-bit", op.bits, bitInfo,
-    (c, inf) => inf.names && inf.names.chi || "");
+  const bladeSec = partSection("戰刃 Blade", "mine-blade", "blade", op.blades, bladeInfo,
+    (c) => bladeName(c), null);
+  const ratchetSec = partSection("固鎖 Ratchet", "mine-ratchet", "ratchet", op.ratchets, ratchetInfo,
+    () => "", (c) => ratchetImageSrc(c));
+  const bitSec = partSection("軸 Bit", "mine-bit", "bit", op.bits, bitInfo,
+    (c, inf) => inf.names && inf.names.chi || "", (c) => bitImageSrc(c));
 
   const toggle = `<div style="display:flex; gap:6px; margin-bottom:14px;">
-    <button class="${mineView === 'detail' ? 'primary' : ''}" onclick="setMineView('detail')">📋 卡片</button>
-    <button class="${mineView === 'table' ? 'primary' : ''}" onclick="setMineView('table')">📊 表格</button>
+    <button class="${mineView === 'detail' ? 'primary' : ''}" onclick="setMineView('detail')">卡片</button>
+    <button class="${mineView === 'table' ? 'primary' : ''}" onclick="setMineView('table')">表格</button>
   </div>`;
 
   if (mineView === "table") return `<div>${toggle}${renderCollectionTable(q)}</div>`;
 
   return `<div>${toggle}
-    <h2 id="mine-products" style="margin-top:0;">🌀 陀螺戰士 <span class="pill" style="font-size:12px;">${ownedProducts.length}</span></h2>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;">${productsHtml}</div>
+    <h2 id="mine-products" class="mine-sec-head">陀螺商品 <span class="pill" style="font-size:12px;">${filteredProds.length}</span></h2>
+    <div class="mine-prod-list">${productsHtml}</div>
     ${bladeSec}
     ${ratchetSec}
     ${bitSec}
@@ -1884,7 +1949,7 @@ function renderCollectionTable(q) {
               <td style="padding:6px 8px; text-align:right; color:var(--owned); font-weight:600;">${totalQty}</td>
               <td style="padding:6px 8px;">
                 <div class="source-list">
-                  ${productIds.map(pid => `<span class="src owned" onclick="switchTab('products'); select('product','${pid}')" title="${productTypeName(PRODUCTS[pid].type)}">${pid}</span>`).join("")}
+                  ${productIds.map(pid => `<span class="src owned" onclick="switchTab('products',activeTab); select('product','${pid}')" title="${productTypeName(PRODUCTS[pid].type)}">${pid}</span>`).join("")}
                 </div>
               </td>
             </tr>`;
@@ -1916,7 +1981,13 @@ function renderProductDetail(p) {
     const cnDisplay = `${bChi} · ${ratchetDisplay} · ${bitChi}`;
     const meta = [];
     if (v.opts.get)  meta.push(`每箱 ${v.opts.get} 盒`);
-    if (v.opts.coat) meta.push(`配色 ${v.opts.coat}`);
+    if (v.opts.coat) meta.push(`<span style="color:${v.opts.coat};">●</span> ${coatName(v.opts.coat)}版`);
+    const attrLabels = [];
+    if (blade?.attr) {
+      const ATTR_L = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
+      blade.attr.forEach(a => { if (ATTR_L[a]) attrLabels.push(`<span class="pill ${a}">${ATTR_L[a]}</span>`); });
+      if (blade.attr.includes("left")) attrLabels.push(`<span class="pill" style="background:var(--panel2);">左旋</span>`);
+    }
     const qty = ownedQty(v.id);
     const owned = qty > 0;
     const wished = isWishlisted(v.id);
@@ -1924,6 +1995,7 @@ function renderProductDetail(p) {
       <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       <div>
         <div class="vbey">${cnDisplay}</div>
+        ${attrLabels.length ? `<div style="margin:2px 0;">${attrLabels.join("")}</div>` : ""}
         <div class="vparts" style="font-family:monospace;">${codeStr}</div>
         ${meta.length ? `<div class="vparts">${meta.join(" · ")}</div>` : ""}
       </div>
