@@ -27,6 +27,31 @@
     --missing: #ff6b6b;
     --warn: #f5a623;
   }
+  [data-theme="light"] {
+    --bg: #f0f2f5;
+    --panel: #ffffff;
+    --panel2: #e8ecf0;
+    --border: #d0d5dd;
+    --text: #1a1a2e;
+    --muted: #5a6370;
+    --accent: #2563eb;
+    --accent2: #1e4db7;
+    --owned: #16a34a;
+    --missing: #dc2626;
+    --warn: #d97706;
+  }
+  [data-theme="light"] .tier-T0   { background: #fee2e2; color: #991b1b; }
+  [data-theme="light"] .tier-T0-5 { background: #fce7f3; color: #831843; }
+  [data-theme="light"] .tier-T1   { background: #fef3c7; color: #92400e; }
+  [data-theme="light"] .tier-T1-5 { background: #ecfccb; color: #3f6212; }
+  [data-theme="light"] .tier-T2   { background: #dcfce7; color: #166534; }
+  [data-theme="light"] .tier-T3   { background: #dbeafe; color: #1e40af; }
+  [data-theme="light"] .tier-T4   { background: #e9e5f5; color: #4338ca; }
+  [data-theme="light"] .tier-T5   { background: #e8ecf0; color: #5a6370; }
+  [data-theme="light"] .pill.att { background: #fee2e2; color: #991b1b; }
+  [data-theme="light"] .pill.def { background: #dbeafe; color: #1e40af; }
+  [data-theme="light"] .pill.sta { background: #dcfce7; color: #166534; }
+  [data-theme="light"] .pill.bal { background: #fef3c7; color: #92400e; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
@@ -343,6 +368,8 @@
     <div class="more-wrap">
       <button id="more-btn" onclick="toggleMoreMenu(event)" title="更多選項" aria-haspopup="true"><svg viewBox="0 0 16 16" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" fill="currentColor" aria-hidden="true"><rect x="1" y="3" width="14" height="2" rx="1"/><rect x="1" y="7" width="14" height="2" rx="1"/><rect x="1" y="11" width="14" height="2" rx="1"/></svg>選單</button>
       <div id="more-menu" class="more-menu" role="menu">
+        <button onclick="closeMoreMenu(); toggleTheme()" id="theme-btn">🌙 切換主題</button>
+        <hr>
         <button onclick="closeMoreMenu(); openImport()">📥 匯入</button>
         <button onclick="closeMoreMenu(); openExportShare()">📤 匯出 / 分享</button>
         <hr>
@@ -587,10 +614,11 @@ function loadState() {
       if (!Array.isArray(s.builds)) s.builds = [];
       if (typeof s.updatedAt !== "number") s.updatedAt = 0;
       if (!s.prefs || typeof s.prefs !== "object") s.prefs = {};
+      if (!s.wishlist || typeof s.wishlist !== "object") s.wishlist = {};
       return s;
     }
   } catch (e) {}
-  return { owned: {}, builds: [], updatedAt: 0, prefs: {} };
+  return { owned: {}, builds: [], updatedAt: 0, prefs: {}, wishlist: {} };
 }
 // 是否正在從 Drive 套用遠端資料 (套用過程不應該再回推)
 let _applyingRemote = false;
@@ -608,6 +636,24 @@ function setOwned(vid, qty) {
 }
 function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
 function ownedQty(vid) { return state.owned[vid] || 0; }
+function isWishlisted(vid) { return !!state.wishlist[vid]; }
+function toggleWishlist(vid) {
+  if (state.wishlist[vid]) delete state.wishlist[vid];
+  else state.wishlist[vid] = 1;
+  saveState(); render();
+}
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  state.prefs.theme = next;
+  saveState();
+  updateThemeBtn();
+  document.querySelector('meta[name="theme-color"]').content = next === "light" ? "#ffffff" : "#0f1115";
+}
+function updateThemeBtn() {
+  const btn = document.getElementById("theme-btn");
+  if (btn) btn.textContent = document.documentElement.dataset.theme === "light" ? "🌙 深色模式" : "☀️ 淺色模式";
+}
 
 // 配置 (builds) 操作
 function newBuildId() { return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -674,6 +720,7 @@ let selected = null; // { type: "product"|"blade"|"ratchet"|"bit", id }
 let filterOpts = {
   ownedOnly: false,
   missingOnly: false,
+  wishlistOnly: false,
   series: {},
 };
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
@@ -754,9 +801,11 @@ function buildFilters() {
   searchEl.placeholder = "搜尋商品代號 / 陀螺 / 零件 / 中文名…";
   if (activeTab === "products") {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
+    const hasWishlist = Object.keys(state.wishlist).length > 0;
     wrap.innerHTML = `
-      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; render()"> 只看擁有</label>
-      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; render()"> 只看缺少</label>
+      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; filterOpts.wishlistOnly=false; render()"> 只看擁有</label>
+      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; filterOpts.wishlistOnly=false; render()"> 只看缺少</label>
+      ${hasWishlist ? `<label><input type="checkbox" ${filterOpts.wishlistOnly ? "checked" : ""} onchange="filterOpts.wishlistOnly=this.checked; filterOpts.ownedOnly=false; filterOpts.missingOnly=false; render()"> ★ 想要</label>` : ""}
       <span style="border-left:1px solid var(--border); margin: 0 4px;"></span>
       ${series.map(s => `<label><input type="checkbox" ${filterOpts.series[s] !== false ? "checked" : ""} onchange="filterOpts.series['${s}']=this.checked; render()"> ${s}</label>`).join("")}
     `;
@@ -1090,6 +1139,7 @@ function renderProductList(q) {
       const total = p.variants.length;
       if (filterOpts.ownedOnly && ownedV === 0) return "";
       if (filterOpts.missingOnly && ownedV === total) return "";
+      if (filterOpts.wishlistOnly && !p.variants.some(v => isWishlisted(v.id))) return "";
       visible++;
       const cls = (ownedV === total ? "owned" : "") + (selected && selected.type==="product" && selected.id===p.id ? " selected" : "");
       const blades = [...new Set(p.variants
@@ -1105,9 +1155,10 @@ function renderProductList(q) {
         ? `event.stopPropagation(); setOwned('${onlyV.id}', ${isOwned(onlyV.id) ? 0 : 1})`
         : "";
       const checkTitle = isSingle ? "點此快速切換擁有/未擁有" : "";
+      const hasWish = p.variants.some(v => isWishlisted(v.id));
       return `<div class="item ${cls}" onclick="select('product','${p.id}')">
         <span class="check ${isSingle ? "toggleable" : ""}" ${checkClick ? `onclick="${checkClick}"` : ""} title="${checkTitle}">${checkChar}</span>
-        <span class="name">${p.id}</span>
+        <span class="name">${hasWish ? "★ " : ""}${p.id}</span>
         <span style="color:var(--muted); font-size:11px;" title="${p.type}">${productTypeName(p.type)}</span>
         <span style="font-size:11px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${blades.join("、")}">${bladesStr}</span>
         <span class="qty">${ownedV}/${total}</span>
@@ -1688,6 +1739,7 @@ function renderProductDetail(p) {
     if (v.opts.coat) meta.push(`配色 ${v.opts.coat}`);
     const qty = ownedQty(v.id);
     const owned = qty > 0;
+    const wished = isWishlisted(v.id);
     return `<div class="variant ${owned ? "owned" : ""}">
       <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       <div>
@@ -1695,6 +1747,7 @@ function renderProductDetail(p) {
         <div class="vparts" style="font-family:monospace;">${codeStr}</div>
         ${meta.length ? `<div class="vparts">${meta.join(" · ")}</div>` : ""}
       </div>
+      <button onclick="event.stopPropagation(); toggleWishlist('${v.id}')" title="${wished ? "取消想要" : "加入想要"}" style="font-size:16px; padding:4px 8px; border:none; background:none; cursor:pointer; color:${wished ? "var(--warn)" : "var(--muted)"};">${wished ? "★" : "☆"}</button>
       <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
       <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
       <button onclick="setOwned('${v.id}', ${qty + 1})">＋</button>
@@ -1707,8 +1760,17 @@ function renderProductDetail(p) {
       <img class="prod-img" src="${productImageSrc(p.id)}" alt="${p.id}"
            loading="lazy" onerror="this.parentElement.style.display='none'">
     </div>
+    <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+      ${ownedV < p.variants.length ? `<button onclick="batchOwn('${p.id}', true)">✓ 全部擁有</button>` : ""}
+      ${ownedV > 0 ? `<button class="danger" onclick="batchOwn('${p.id}', false)">✗ 全部取消</button>` : ""}
+    </div>
     <div class="variants">${variants}</div>
   </div>`;
+}
+function batchOwn(pid, own) {
+  const p = PRODUCTS[pid]; if (!p) return;
+  p.variants.forEach(v => { if (own) state.owned[v.id] = 1; else delete state.owned[v.id]; });
+  saveState(); render();
 }
 
 function renderPartDetail(type, code) {
@@ -1759,6 +1821,29 @@ function renderPartDetail(type, code) {
       ${stat.length ? `<div class="row"><span class="k">數據</span><span class="v" style="font-family:monospace">${stat.join(" / ")}</span></div>` : ""}
       ${info.desc ? `<div class="desc">${info.desc}</div>` : ""}
     </div>
+
+    ${(() => {
+      const tier = DB.tier || {};
+      let tierLabel = null;
+      if (type === "ratchet" && tier.ratchet) {
+        for (const [t, codes] of Object.entries(tier.ratchet)) { if (codes.includes(code)) { tierLabel = t; break; } }
+      } else if (type === "bit" && tier.bit) {
+        for (const [t, codes] of Object.entries(tier.bit)) { if (codes.includes(code)) { tierLabel = t; break; } }
+      } else if (type === "blade" && tier.blade) {
+        for (const [t, names] of Object.entries(tier.blade)) {
+          if (names.some(n => tierIsBladeOwned(n, new Set([code])))) { tierLabel = t; break; }
+        }
+      }
+      if (!tierLabel) return "";
+      return `<div class="card">
+        <h3>排行榜定位</h3>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="tier-label tier-${tierLabel.replace(".", "-")}" style="font-size:16px; padding:6px 12px;">${tierLabel}</span>
+          <span style="color:var(--muted); font-size:12px;">點擊查看完整排行榜 →</span>
+        </div>
+        <button onclick="switchTab('tier')" style="margin-top:8px; font-size:12px;">前往排行榜</button>
+      </div>`;
+    })()}
 
     <div class="card">
       <h3>來自哪些商品（${sources.filter(v => isOwned(v.id)).length}/${sources.length} 已擁有）</h3>
@@ -1863,6 +1948,7 @@ async function _populateExportText(fmt) {
     exportedAt: new Date().toISOString(),
     owned: state.owned,
     builds: state.builds || [],
+    wishlist: state.wishlist || {},
   };
   const json = JSON.stringify(exportData, null, fmt === "json" ? 2 : 0);
   const ta = document.getElementById("io-text");
@@ -1947,6 +2033,10 @@ async function doImport(replace) {
   // 一併匯入配置 (builds)
   if (Array.isArray(data.builds)) {
     state.builds = replace ? data.builds : [...(state.builds || []), ...data.builds];
+  }
+  // 一併匯入願望清單
+  if (data.wishlist && typeof data.wishlist === "object") {
+    state.wishlist = replace ? data.wishlist : { ...(state.wishlist || {}), ...data.wishlist };
   }
   saveState();
   closeModal();
@@ -2711,8 +2801,20 @@ async function syncBootstrap() {
 // ============================================================
 // 啟動
 // ============================================================
+// 套用主題
+if (state.prefs.theme === "light") {
+  document.documentElement.dataset.theme = "light";
+  document.querySelector('meta[name="theme-color"]').content = "#ffffff";
+}
+updateThemeBtn();
+
 render();
 syncBootstrap();
+
+// 註冊 Service Worker (離線支援)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>
