@@ -52,6 +52,12 @@
   [data-theme="light"] .pill.def { background: #dbeafe; color: #1e40af; }
   [data-theme="light"] .pill.sta { background: #dcfce7; color: #166534; }
   [data-theme="light"] .pill.bal { background: #fef3c7; color: #92400e; }
+  [data-theme="light"] .tier-pill { background: #e2e6ec; color: #1a1a2e; border-color: #c0c6d0; }
+  [data-theme="light"] .tier-pill.owned { background: rgba(22,163,74,0.15); color: #15803d; border-color: #16a34a; }
+  [data-theme="light"] .tier-pill.missing { opacity: 0.45; }
+  [data-theme="light"] .tier-pill[onclick]:hover { background: #d0d6e0; }
+  [data-theme="light"] button:hover { background: #d8dde5; }
+  [data-theme="light"] button.primary:hover { background: #3b82f6; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
@@ -121,14 +127,39 @@
   }
   .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
-  .toolbar { padding: 10px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--border); }
+  .toolbar { padding: 10px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10; background: var(--panel);
+  }
   .toolbar input[type="search"] {
     width: 100%; padding: 7px 10px; background: var(--bg);
     border: 1px solid var(--border); color: var(--text); border-radius: 6px;
   }
-  .filters { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-  .filters label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-  .filters input { margin: 0; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); align-items: center; }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 14px; cursor: pointer;
+    border: 1.5px solid var(--border); background: transparent;
+    font-size: 12px; color: var(--muted); transition: all 0.15s;
+    user-select: none; -webkit-user-select: none;
+  }
+  .filter-chip:not(.active) { opacity: 0.5; }
+  .filter-chip.active { color: var(--text); border-color: var(--accent); background: rgba(37,99,235,0.12); }
+  .filter-chip.active[data-f="owned"] { border-color: var(--owned); background: rgba(22,163,74,0.12); color: var(--owned); }
+  .filter-chip.active[data-f="missing"] { border-color: var(--missing); background: rgba(220,38,38,0.12); color: var(--missing); }
+  .filter-chip.active[data-f="wishlist"] { border-color: var(--warn); background: rgba(217,119,6,0.12); color: var(--warn); }
+  .series-chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 10px; border-radius: 14px; cursor: pointer;
+    border: 1.5px solid var(--border); background: transparent;
+    font-size: 12px; color: var(--muted); transition: all 0.15s;
+    user-select: none; -webkit-user-select: none;
+  }
+  .series-chip img { width: 18px; height: 18px; }
+  .series-chip.active { color: var(--text); }
+  .series-chip.active[data-s="BX"] { border-color: #71bce9; background: rgba(113,188,233,0.12); }
+  .series-chip.active[data-s="CX"] { border-color: #f42597; background: rgba(244,37,151,0.12); }
+  .series-chip.active[data-s="UX"] { border-color: #ee7800; background: rgba(238,120,0,0.12); }
+  .series-chip:not(.active) { opacity: 0.4; }
 
   .list { flex: 1; overflow: auto; padding: 4px 0; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .group {
@@ -243,7 +274,7 @@
   }
   .variant {
     border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
-    display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 10px; align-items: center;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
   }
   .variant.owned { border-color: var(--owned); background: rgba(46,204,113,0.05); }
   .variant .vbey { font-weight: 600; }
@@ -458,7 +489,10 @@ function productSort(id) {
 
 function productSeries(id) {
   const m = id.match(/^([A-Z]+)/);
-  return m ? m[1] : "其他";
+  if (!m) return "其他";
+  const s = m[1];
+  if (s === "BXA" || s === "BXC" || s === "BXG" || s === "BXH") return "BX";
+  return s;
 }
 
 // 零件查找
@@ -801,18 +835,21 @@ function buildFilters() {
   searchEl.placeholder = "搜尋商品代號 / 陀螺 / 零件 / 中文名…";
   if (activeTab === "products") {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
-    const hasWishlist = Object.keys(state.wishlist).length > 0;
+    const seriesIcon = s => {
+      const icons = { BX: 1, CX: 1, UX: 1 };
+      if (icons[s]) return `<img src="https://go-shoot.github.io/x/img/lines.svg#${s}" alt="${s}" style="width:20px;height:20px;vertical-align:middle;">`;
+      return s;
+    };
     wrap.innerHTML = `
-      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; filterOpts.wishlistOnly=false; render()"> 只看擁有</label>
-      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; filterOpts.wishlistOnly=false; render()"> 只看缺少</label>
-      ${hasWishlist ? `<label><input type="checkbox" ${filterOpts.wishlistOnly ? "checked" : ""} onchange="filterOpts.wishlistOnly=this.checked; filterOpts.ownedOnly=false; filterOpts.missingOnly=false; render()"> ★ 想要</label>` : ""}
-      <span style="border-left:1px solid var(--border); margin: 0 4px;"></span>
-      ${series.map(s => `<label><input type="checkbox" ${filterOpts.series[s] !== false ? "checked" : ""} onchange="filterOpts.series['${s}']=this.checked; render()"> ${s}</label>`).join("")}
+        <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
+        <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
+        <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
+        ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
     `;
   } else {
     wrap.innerHTML = `
-      <label><input type="checkbox" ${filterOpts.ownedOnly ? "checked" : ""} onchange="filterOpts.ownedOnly=this.checked; filterOpts.missingOnly=false; render()"> 只看擁有</label>
-      <label><input type="checkbox" ${filterOpts.missingOnly ? "checked" : ""} onchange="filterOpts.missingOnly=this.checked; filterOpts.ownedOnly=false; render()"> 只看缺少</label>
+      <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly)filterOpts.missingOnly=false; render()">✓ 擁有</span>
+      <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly)filterOpts.ownedOnly=false; render()">✗ 缺少</span>
     `;
   }
 }
@@ -1747,10 +1784,12 @@ function renderProductDetail(p) {
         <div class="vparts" style="font-family:monospace;">${codeStr}</div>
         ${meta.length ? `<div class="vparts">${meta.join(" · ")}</div>` : ""}
       </div>
-      <button onclick="event.stopPropagation(); toggleWishlist('${v.id}')" title="${wished ? "取消想要" : "加入想要"}" style="font-size:16px; padding:4px 8px; border:none; background:none; cursor:pointer; color:${wished ? "var(--warn)" : "var(--muted)"};">${wished ? "★" : "☆"}</button>
-      <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
-      <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
-      <button onclick="setOwned('${v.id}', ${qty + 1})">＋</button>
+      <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+        <button onclick="event.stopPropagation(); toggleWishlist('${v.id}')" title="${wished ? "取消想要" : "加入想要"}" style="font-size:16px; padding:4px 8px; border:none; background:none; cursor:pointer; color:${wished ? "var(--warn)" : "var(--muted)"};">${wished ? "★" : "☆"}</button>
+        <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
+        <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
+        <button onclick="setOwned('${v.id}', ${qty + 1})">＋</button>
+      </div>
     </div>`;
   }).join("");
   return `<div>
