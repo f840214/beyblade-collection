@@ -381,6 +381,20 @@
   .pill.owned { background: var(--owned); color: #002b14; }
   .pill.missing { background: var(--missing); color: #1a0000; }
 
+  .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute; inset: 0; background: var(--panel2); border-radius: 11px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .switch .slider::before {
+    content: ""; position: absolute; left: 2px; top: 2px;
+    width: 18px; height: 18px; background: #fff; border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(18px); }
+
   .empty { color: var(--muted); padding: 30px; text-align: center; }
 
   .tier-row {
@@ -443,22 +457,28 @@
   .mine-part-code { font-size: 11px; color: var(--muted); font-family: monospace; }
   .mine-part-src { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
-  .mine-prod-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .mine-prod-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
   .mine-prod-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+    padding: 10px 12px; background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    position: relative; overflow: hidden;
   }
   .mine-prod-row:hover { border-color: var(--accent); }
   .mine-prod-row.done { border-color: rgba(46,204,113,0.3); }
-  .mine-prod-img { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; border-radius: 6px; }
+  .mine-prod-img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; border-radius: 6px; }
   .mine-prod-info { flex: 1; min-width: 0; }
-  .mine-prod-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mine-prod-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mine-prod-id { color: var(--accent2); }
-  .mine-prod-meta { font-size: 11px; color: var(--muted); }
-  .mine-prod-bar-wrap { width: 50px; height: 4px; background: var(--panel2); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
-  .mine-prod-bar { height: 100%; background: var(--owned); border-radius: 2px; }
-  .mine-prod-done { color: var(--owned); font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .mine-prod-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .mine-prod-status { font-size: 12px; font-weight: 600; flex-shrink: 0; text-align: right; }
+  .mine-prod-status.complete { color: var(--owned); }
+  .mine-prod-status.partial { color: var(--accent); }
+  .mine-prod-bar-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: var(--panel2);
+  }
+  .mine-prod-bar-bottom .fill { height: 100%; background: var(--owned); transition: width 0.2s; }
 
   .progress {
     height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden;
@@ -824,7 +844,7 @@ function updateThemeBtn() {
 function newBuildId() { return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function getBuild(id) { return state.builds.find(b => b.id === id); }
 function newBuild() {
-  const b = { id: newBuildId(), name: "新配置 " + (state.builds.length + 1), blade: "", ratchet: "", bit: "", note: "" };
+  const b = { id: newBuildId(), name: "新配置 " + (state.builds.length + 1), blade: "", ratchet: "", bit: "", note: "", cx: false, chip: "", main: "", over: "", assist: "" };
   state.builds.push(b);
   saveState();
   selected = { type: "build", id: b.id };
@@ -858,6 +878,21 @@ function variantDisplayChi(v) {
 
 function buildStatus(b) {
   const op = ownedParts();
+  if (b.cx) {
+    // CX: check each segment individually + ratchet + bit
+    const cxSegs = ownedCxSegments();
+    const slots = [
+      { code: b.chip, set: cxSegs.chip },
+      { code: b.main, set: new Set([...cxSegs.main, ...cxSegs.metal]) },
+      { code: b.over, set: cxSegs.over },
+      { code: b.assist, set: cxSegs.assist },
+    ];
+    let need = 0, have = 0;
+    slots.forEach(s => { if (s.code) { need++; if (s.set.has(s.code)) have++; } });
+    if (b.ratchet) { need++; if (op.ratchets.has(b.ratchet)) have++; }
+    if (b.bit) { need++; if (op.bits.has(b.bit)) have++; }
+    return { need, have, complete: need > 0 && have === need, missing: need - have };
+  }
   const need = [b.blade, b.ratchet, b.bit].filter(Boolean).length;
   const have = (b.blade && op.blades.has(b.blade) ? 1 : 0) +
                (b.ratchet && op.ratchets.has(b.ratchet) ? 1 : 0) +
@@ -865,6 +900,20 @@ function buildStatus(b) {
   return { need, have, complete: need === 3 && have === 3, missing: need - have };
 }
 
+function ownedCxSegments() {
+  const segs = { chip: new Set(), metal: new Set(), main: new Set(), over: new Set(), assist: new Set() };
+  Object.keys(state.owned).forEach(vid => {
+    const v = VARIANTS.find(x => x.id === vid);
+    if (!v || isEmptyPart(v.blade) || !v.blade.includes(".")) return;
+    const parts = v.blade.split(".");
+    parts.forEach((s, i) => {
+      if (!s || s === "/") return;
+      const f = findCxSegmentAt(s, i, parts.length);
+      if (f) segs[f._category].add(s);
+    });
+  });
+  return segs;
+}
 function ownedParts() {
   const blades = new Set(), ratchets = new Set(), bits = new Set();
   Object.keys(state.owned).forEach(vid => {
@@ -1065,7 +1114,8 @@ function renderBuildsList(q) {
   const builds = state.builds.filter(b => {
     if (!q) return true;
     if (b.name && b.name.toLowerCase().includes(q)) return true;
-    return codeMatches([b.blade, b.ratchet, b.bit].filter(Boolean).join(" "), q);
+    const bladeQ = b.cx ? [b.chip, b.main, b.over, b.assist].filter(Boolean).join(".") : b.blade;
+    return codeMatches([bladeQ, b.ratchet, b.bit].filter(Boolean).join(" "), q);
   });
   if (!state.builds.length) {
     return newBtn + `<div class="empty">還沒有任何配置<br>按上方「+」新增</div>`;
@@ -1073,7 +1123,8 @@ function renderBuildsList(q) {
   const rows = builds.map(b => {
     const status = buildStatus(b);
     const cls = (selected && selected.type === "build" && selected.id === b.id ? " selected" : "") + (status.complete ? " owned" : "");
-    const partsStr = [b.blade, b.ratchet, b.bit].filter(Boolean).join(" ") || "(未設定)";
+    const bladeStr = b.cx ? [b.chip, b.main, b.over, b.assist].filter(Boolean).join(".") : b.blade;
+    const partsStr = [bladeStr, b.ratchet, b.bit].filter(Boolean).join(" ") || "(未設定)";
     const badge = status.complete ? `<span class="qty" style="background:rgba(46,204,113,0.2); color:var(--owned);">✓</span>`
                 : status.need === 0 ? `<span class="qty">空</span>`
                 : `<span class="qty" style="background:rgba(255,107,107,0.15); color:var(--missing);">缺${status.missing}</span>`;
@@ -1605,24 +1656,34 @@ function renderBuildEditor(id) {
         thumbHtml = `<img style="${thumbStyle}" src="${bitImageSrc(code)}" alt="${code}" onerror="this.style.visibility='hidden'">`;
       }
     }
+    const attrPills = [];
+    if (inf?.attr) {
+      const ATTR_L = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
+      inf.attr.forEach(a => { if (ATTR_L[a]) attrPills.push(`<span class="pill ${a}">${ATTR_L[a]}</span>`); });
+      if (inf.attr.includes("left")) attrPills.push(`<span class="pill">左旋</span>`);
+    }
+    const showCode = key === "blade" && cn && cn !== code;
     const body = code
       ? `<div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
            ${thumbHtml}
            <div style="flex:1; min-width:0;">
              <div style="font-size:15px; font-weight:600; line-height:1.3;">${cn || code}</div>
-             <div style="color:var(--muted); font-size:11px; font-family:monospace; margin-top:2px;">
-               ${code} ${ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`}
-             </div>
+             ${showCode ? `<div style="color:var(--muted); font-size:11px; font-family:monospace; margin-top:2px;">${code}</div>` : ""}
+             ${attrPills.length ? `<div style="margin-top:3px;">${attrPills.join("")}</div>` : ""}
+             ${inf?.desc ? `<div style="color:var(--muted); font-size:11px; margin-top:3px; line-height:1.4;">${inf.desc}</div>` : ""}
            </div>
          </div>`
       : `<div style="margin-top:6px; color:var(--muted);">— 未選 —</div>`;
+    const owPill = code ? (ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`) : "";
+    const clearBtn = code ? `<div style="display:flex; justify-content:flex-end; margin-top:8px;"><button onclick="event.stopPropagation(); updateBuildField('${id}','${key}',''); render();" style="font-size:11px; padding:3px 8px;" class="danger">清除</button></div>` : "";
     return `<div class="card" style="cursor:pointer" onclick="openPartPicker('${id}','${key}')">
-      <div style="display:flex; align-items:baseline; gap:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
         <h3 style="margin:0; font-size:13px; color:var(--accent2);">${label}</h3>
+        ${owPill}
         <span style="margin-left:auto; color:var(--muted); font-size:11px;">${code ? "點此變更" : "點此選擇"} ▸</span>
       </div>
       ${body}
-      ${code && code !== "" ? `<button onclick="event.stopPropagation(); updateBuildField('${id}','${key}',''); render();" style="margin-top:8px; font-size:11px; padding:3px 8px;" class="danger">清除</button>` : ""}
+      ${clearBtn}
     </div>`;
   };
   const statusPill = status.need === 0
@@ -1637,15 +1698,87 @@ function renderBuildEditor(id) {
       <button onclick="duplicateBuild('${id}')">複製</button>
       <button class="danger" onclick="deleteBuild('${id}')">刪除</button>
     </div>
-    <div style="margin-bottom:12px;">${statusPill}</div>
-    ${slot("blade", "戰刃 Blade", b.blade, bladeInfo, (c) => bladeName(c), op.blades)}
+    <div style="margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      ${statusPill}
+      <label style="display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; color:var(--muted); cursor:pointer;">
+        CX 組合刃
+        <span class="switch"><input type="checkbox" ${b.cx ? "checked" : ""} onchange="toggleBuildCx('${id}', this.checked)"><span class="slider"></span></span>
+      </label>
+    </div>
+    ${b.cx ? renderCxSlots(id, b, op) : slot("blade", "戰刃 Blade", b.blade, bladeInfo, (c) => bladeName(c), op.blades)}
     ${slot("ratchet", "固鎖 Ratchet", b.ratchet, ratchetInfo, () => "", op.ratchets)}
     ${slot("bit", "軸 Bit", b.bit, bitInfo,
       (c, i) => preferredChi(i && i.names && i.names.chi), op.bits)}
-    <textarea placeholder="備註 (選填，例: 攻擊型、台場限定…)"
+    <textarea placeholder="備註"
               oninput="updateBuildField('${id}','note', this.value)"
               style="width:100%; min-height:60px; margin-top:14px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px; font-family:inherit;">${(b.note || '').replace(/</g, '&lt;')}</textarea>
   </div>`;
+}
+
+function toggleBuildCx(id, on) {
+  const b = getBuild(id); if (!b) return;
+  b.cx = on;
+  if (on) { b.blade = ""; b.chip = b.chip || ""; b.main = b.main || ""; b.over = b.over || ""; b.assist = b.assist || ""; }
+  else { b.chip = ""; b.main = ""; b.over = ""; b.assist = ""; }
+  saveState(); render();
+}
+const CX_SLOT_LABELS = { chip: "紋章 Chip", main: "超越戰刃 Over Blade", over: "鋼鐵戰刃 Metal Blade", assist: "輔助戰刃 Assist Blade" };
+function renderCxSlots(id, b, op) {
+  const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
+  const cxSegs = ownedCxSegments();
+  return ["chip", "main", "over", "assist"].map(cat => {
+    const code = b[cat] || "";
+    const parts = cx[cat] || {};
+    const ownSet = cat === "main" ? new Set([...cxSegs.main, ...cxSegs.metal]) : cxSegs[cat];
+    const ow = code && ownSet && ownSet.has(code);
+    const inf = code ? (parts[code] || {}) : null;
+    const cn = inf?.names ? (preferredChi(inf.names.chi) || inf.names.eng || "") : "";
+    const thumbStyle = "width:50px; height:50px; object-fit:contain; flex-shrink:0; background:rgba(255,255,255,0.02); border-radius:4px;";
+    const thumbSrc = code ? `blades/CX/${cat}/${encodeURIComponent(code)}.png` : "";
+    const thumbHtml = code ? `<img style="${thumbStyle}" src="${thumbSrc}" alt="${code}" onerror="this.style.visibility='hidden'">` : "";
+    const attrPills = [];
+    if (inf?.attr) {
+      const ATTR_L = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
+      inf.attr.forEach(a => { if (ATTR_L[a]) attrPills.push(`<span class="pill ${a}">${ATTR_L[a]}</span>`); });
+    }
+    const body = code
+      ? `<div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+           ${thumbHtml}
+           <div style="flex:1; min-width:0;">
+             <div style="font-size:14px; font-weight:600;">${cn || code}</div>
+             ${cn && cn !== code ? `<div style="color:var(--muted); font-size:11px; font-family:monospace;">${code}</div>` : ""}
+             ${attrPills.length ? `<div style="margin-top:2px;">${attrPills.join("")}</div>` : ""}
+             ${inf?.desc ? `<div style="color:var(--muted); font-size:11px; margin-top:2px; line-height:1.4;">${inf.desc}</div>` : ""}
+           </div>
+         </div>`
+      : `<div style="margin-top:6px; color:var(--muted);">— 未選 —</div>`;
+    const clearBtn = code ? `<div style="display:flex; justify-content:flex-end; margin-top:6px;"><button onclick="event.stopPropagation(); updateBuildField('${id}','${cat}',''); render();" style="font-size:11px; padding:3px 8px;" class="danger">清除</button></div>` : "";
+    const owPill = code ? (ow ? `<span class="pill owned">已擁有</span>` : `<span class="pill missing">未擁有</span>`) : "";
+    return `<div class="card" style="cursor:pointer" onclick="openCxPicker('${id}','${cat}')">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h3 style="margin:0; font-size:13px; color:var(--accent2);">${CX_SLOT_LABELS[cat]}</h3>
+        ${owPill}
+        <span style="margin-left:auto; color:var(--muted); font-size:11px;">${code ? "點此變更" : "點此選擇"} ▸</span>
+      </div>
+      ${body}
+      ${clearBtn}
+    </div>`;
+  }).join("");
+}
+function openCxPicker(buildId, cat) {
+  pickerCtx = { buildId, slot: "cx_" + cat, cxCat: cat, query: "", onlyOwned: false };
+  showModal(`選擇 ${CX_SLOT_LABELS[cat]}`, `
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+      <input type="search" id="picker-q" placeholder="搜尋代號 / 中文名"
+             oninput="pickerCtx.query = this.value; renderPartPickerList();"
+             style="flex:1; min-width:160px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
+    </div>
+    <div id="picker-list" style="max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:6px;"></div>
+  `, [
+    { label: "取消", action: () => { pickerCtx = null; closeModal(); } }
+  ]);
+  renderPartPickerList();
+  setTimeout(() => { const e = document.getElementById("picker-q"); if (e) e.focus(); }, 30);
 }
 
 let pickerCtx = null;
@@ -1673,6 +1806,33 @@ function openPartPicker(buildId, slot) {
 function renderPartPickerList() {
   const ctx = pickerCtx; if (!ctx) return;
   const listEl = document.getElementById("picker-list"); if (!listEl) return;
+  // CX segment picker
+  if (ctx.cxCat) {
+    const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
+    const parts = cx[ctx.cxCat] || {};
+    const all = Object.keys(parts).sort();
+    const q = (ctx.query || "").toLowerCase().trim();
+    const filtered = all.filter(c => {
+      if (!q) return true;
+      const inf = parts[c] || {};
+      const chi = inf.names ? (inf.names.chi || "") : "";
+      const eng = inf.names ? (inf.names.eng || "") : "";
+      return c.toLowerCase().includes(q) || chi.toLowerCase().includes(q) || eng.toLowerCase().includes(q);
+    });
+    if (!filtered.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;">沒有符合條件</div>`; return; }
+    const thumbStyle = "width:40px; height:40px; object-fit:contain; flex-shrink:0; background:rgba(255,255,255,0.02); border-radius:4px;";
+    listEl.innerHTML = filtered.map(c => {
+      const inf = parts[c] || {};
+      const cn = inf.names ? (preferredChi(inf.names.chi) || inf.names.eng || "") : "";
+      const src = `blades/CX/${ctx.cxCat}/${encodeURIComponent(c)}.png`;
+      return `<div class="item" style="padding:6px 12px; cursor:pointer; gap:10px;" onclick="pickPart('${escapeAttr(c)}')">
+        <img style="${thumbStyle}" src="${src}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="name">${cn || c}</span>
+        ${cn && cn !== c ? `<span style="margin-left:auto; color:var(--muted); font-family:monospace; font-size:11px;">${c}</span>` : ""}
+      </div>`;
+    }).join("");
+    return;
+  }
   const op = ownedParts();
   const all = ctx.slot === "blade" ? [...ALL_BLADES] : ctx.slot === "ratchet" ? [...ALL_RATCHETS] : [...ALL_BITS];
   const ownedSet = ctx.slot === "blade" ? op.blades : ctx.slot === "ratchet" ? op.ratchets : op.bits;
@@ -1720,7 +1880,11 @@ function renderPartPickerList() {
 function pickPart(code) {
   const ctx = pickerCtx; if (!ctx) return;
   const b = getBuild(ctx.buildId); if (!b) return;
-  b[ctx.slot] = code;
+  if (ctx.cxCat) {
+    b[ctx.cxCat] = code;
+  } else {
+    b[ctx.slot] = code;
+  }
   saveState();
   pickerCtx = null;
   closeModal();
@@ -1868,8 +2032,8 @@ function renderCollection() {
             <div class="mine-prod-title"><span class="mine-prod-id">${p.id}</span> ${nameStr}</div>
             <div class="mine-prod-meta">${productTypeName(p.type)} · ${ownedV}/${total}</div>
           </div>
-          <div class="mine-prod-bar-wrap"><div class="mine-prod-bar" style="width:${pct}%"></div></div>
-          ${done ? `<span class="mine-prod-done">✓</span>` : ""}
+          <span class="mine-prod-status ${done ? "complete" : "partial"}">${done ? "✓ 完成" : `${ownedV}/${total}`}</span>
+          <div class="mine-prod-bar-bottom"><div class="fill" style="width:${pct}%"></div></div>
         </div>`;
       }).join("");
 
