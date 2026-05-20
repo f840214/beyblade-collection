@@ -807,14 +807,23 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   if (!_applyingRemote && typeof scheduleSyncPush === "function") scheduleSyncPush();
 }
+function _saveScroll() {
+  const main = document.querySelector(".main");
+  return { mainTop: main ? main.scrollTop : 0, winTop: window.scrollY };
+}
+function _restoreScroll(s) {
+  const main = document.querySelector(".main");
+  if (main) main.scrollTop = s.mainTop;
+  window.scrollTo(0, s.winTop);
+}
 function setOwned(vid, qty) {
   qty = Math.max(0, parseInt(qty) || 0);
   if (qty <= 0) delete state.owned[vid];
   else state.owned[vid] = qty;
   saveState();
-  const top = window.scrollY;
+  const s = _saveScroll();
   render();
-  window.scrollTo(0, top);
+  _restoreScroll(s);
 }
 function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
 function ownedQty(vid) { return state.owned[vid] || 0; }
@@ -823,9 +832,9 @@ function toggleWishlist(vid) {
   if (state.wishlist[vid]) delete state.wishlist[vid];
   else state.wishlist[vid] = 1;
   saveState();
-  const top = window.scrollY;
+  const s = _saveScroll();
   render();
-  window.scrollTo(0, top);
+  _restoreScroll(s);
 }
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
