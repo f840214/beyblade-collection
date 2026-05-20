@@ -848,13 +848,19 @@ function _patchVariantRow(vid) {
     const input = actions.querySelector(".vqty");
     if (input) input.value = qty;
   }
-  // Update header owned count
-  const sub = document.querySelector(".detail .sub");
-  if (sub && selected && selected.type === "product") {
+  // Update header owned count + batch buttons
+  if (selected && selected.type === "product") {
     const p = PRODUCTS[selected.id];
     if (p) {
       const ownedV = p.variants.filter(v => isOwned(v.id)).length;
-      sub.textContent = `擁有 ${ownedV}/${p.variants.length} 陀螺`;
+      const sub = document.querySelector(".detail .sub");
+      if (sub) sub.textContent = `擁有 ${ownedV}/${p.variants.length} 陀螺`;
+      const bb = document.getElementById("batch-btns");
+      if (bb) {
+        bb.innerHTML =
+          (ownedV < p.variants.length ? `<button onclick="batchOwn('${p.id}', true)">✓ 全部擁有</button>` : "") +
+          (ownedV > 0 ? `<button class="danger" onclick="batchOwn('${p.id}', false)">✗ 全部取消</button>` : "");
+      }
     }
   }
   return true;
@@ -2233,7 +2239,7 @@ function renderProductDetail(p) {
       <img class="prod-img" src="${productImageSrc(p.id)}" alt="${p.id}"
            loading="lazy" onerror="this.parentElement.style.display='none'">
     </div>
-    <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+    <div id="batch-btns" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
       ${ownedV < p.variants.length ? `<button onclick="batchOwn('${p.id}', true)">✓ 全部擁有</button>` : ""}
       ${ownedV > 0 ? `<button class="danger" onclick="batchOwn('${p.id}', false)">✗ 全部取消</button>` : ""}
     </div>
