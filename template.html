@@ -161,6 +161,51 @@
   .series-chip.active[data-s="UX"] { border-color: #ee7800; background: rgba(238,120,0,0.12); }
   .series-chip:not(.active) { opacity: 0.4; }
 
+  .view-toggle {
+    display: inline-flex; align-items: center; gap: 2px;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .view-toggle button {
+    padding: 3px 8px; font-size: 14px; border-radius: 4px;
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; line-height: 1;
+  }
+  .view-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .product-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px; padding: 8px 10px;
+  }
+  .product-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; cursor: pointer; transition: all 0.2s;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .product-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .product-card.owned { border-color: rgba(46,204,113,0.4); }
+  .product-card .pc-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .product-card .pc-code { font-weight: 700; font-size: 14px; }
+  .product-card .pc-badge {
+    padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 600;
+  }
+  .product-card .pc-badge.done { background: var(--owned); color: #002b14; }
+  .product-card .pc-badge.partial { background: var(--warn); color: #1a1a2e; }
+  .product-card .pc-type { color: var(--muted); font-size: 11px; }
+  .product-card .pc-img {
+    width: 100%; aspect-ratio: 1; object-fit: contain;
+  }
+  .product-card .pc-foot {
+    display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted);
+  }
+  .product-card .pc-bar {
+    flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;
+  }
+  .product-card .pc-bar-fill {
+    height: 100%; background: var(--owned); border-radius: 2px; transition: width 0.3s;
+  }
+
   .list { flex: 1; overflow: auto; padding: 4px 0; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .group {
     border-top: 1px solid var(--border);
@@ -759,6 +804,7 @@ let filterOpts = {
 };
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
 let mineView = "detail"; // detail | table
+let productView = "list"; // list | grid
 
 // 情報: 從自己的 lineup-scraped.json 讀取（由 GitHub Actions 每日爬取 Takara Tomy）
 const NEWS_URL = "data/lineup-scraped.json";
@@ -865,6 +911,10 @@ function buildFilters() {
         <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
         <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
         ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
+        <span class="view-toggle">
+          <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()" title="列表">☰</button>
+          <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()" title="卡片">▦</button>
+        </span>
     `;
   } else {
     wrap.innerHTML = `
@@ -899,7 +949,7 @@ function renderList() {
   const q = document.getElementById("search").value.trim().toLowerCase();
   const listEl = document.getElementById("list");
   if (activeTab === "products") {
-    listEl.innerHTML = renderProductList(q);
+    listEl.innerHTML = productView === "grid" ? renderProductGrid(q) : renderProductList(q);
   } else if (activeTab === "parts") {
     listEl.innerHTML = renderPartList(q);
   } else if (activeTab === "mine") {
@@ -1230,6 +1280,60 @@ function renderProductList(q) {
           <span class="count">${visible} / ${items.length}</span>
         </div>
         <div class="group-body">${rows}</div>
+      </div>`);
+    }
+  });
+  return html.join("") || `<div class="empty">沒有符合條件的商品</div>`;
+}
+
+function renderProductGrid(q) {
+  const seriesMap = {};
+  PRODUCT_LIST.forEach(p => {
+    const s = productSeries(p.id);
+    if (filterOpts.series[s] === false) return;
+    if (!seriesMap[s]) seriesMap[s] = [];
+    seriesMap[s].push(p);
+  });
+  const html = [];
+  Object.keys(seriesMap).sort().forEach(s => {
+    const items = seriesMap[s].filter(p => productMatches(p, q));
+    if (!items.length) return;
+    const cards = [];
+    items.forEach(p => {
+      const ownedV = p.variants.filter(v => isOwned(v.id)).length;
+      const total = p.variants.length;
+      if (filterOpts.ownedOnly && ownedV === 0) return;
+      if (filterOpts.missingOnly && ownedV === total) return;
+      if (filterOpts.wishlistOnly && !p.variants.some(v => isWishlisted(v.id))) return;
+      const pct = total > 0 ? (ownedV / total * 100) : 0;
+      const badgeHtml = ownedV === total
+        ? `<span class="pc-badge done">完成</span>`
+        : ownedV > 0
+        ? `<span class="pc-badge partial">${ownedV}/${total}</span>`
+        : "";
+      const cls = ownedV > 0 ? "owned" : "";
+      cards.push(`<div class="product-card ${cls}" onclick="select('product','${p.id}')">
+        <div class="pc-header">
+          <span class="pc-code">${p.id}</span>
+          ${badgeHtml}
+        </div>
+        <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
+        <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.style.display='none'">
+        <div class="pc-foot">
+          <span>${ownedV}/${total}</span>
+          <div class="pc-bar"><div class="pc-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      </div>`);
+    });
+    if (cards.length) {
+      const gkey = "products:" + s;
+      const collapsed = collapsedGroups.has(gkey);
+      html.push(`<div class="group ${collapsed ? "collapsed" : ""}">
+        <div class="group-head" onclick="toggleGroup('${gkey}')">
+          <span>${s} 系列</span>
+          <span class="count">${cards.length} / ${items.length}</span>
+        </div>
+        <div class="group-body"><div class="product-grid">${cards.join("")}</div></div>
       </div>`);
     }
   });
