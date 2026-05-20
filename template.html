@@ -812,7 +812,8 @@ function setOwned(vid, qty) {
   if (qty <= 0) delete state.owned[vid];
   else state.owned[vid] = qty;
   saveState();
-  _renderKeepScroll();
+  if (!_patchVariantRow(vid)) render();
+  renderStats(); renderList();
 }
 function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
 function ownedQty(vid) { return state.owned[vid] || 0; }
@@ -821,30 +822,42 @@ function toggleWishlist(vid) {
   if (state.wishlist[vid]) delete state.wishlist[vid];
   else state.wishlist[vid] = 1;
   saveState();
-  _renderKeepScroll();
+  if (!_patchVariantRow(vid)) render();
+  renderStats(); renderList();
 }
-function _renderKeepScroll() {
-  // Collect scroll positions from all possible scroll containers
-  const main = document.querySelector(".main");
-  const detail = document.getElementById("detail");
-  const tops = {
-    mainTop: main ? main.scrollTop : 0,
-    detailTop: detail ? detail.scrollTop : 0,
-    winTop: window.scrollY,
-  };
-  render();
-  // Restore synchronously
-  if (main) main.scrollTop = tops.mainTop;
-  if (detail) detail.scrollTop = tops.detailTop;
-  window.scrollTo(0, tops.winTop);
-  // Also restore after browser layout pass (Safari/iOS needs this)
-  requestAnimationFrame(() => {
-    const main2 = document.querySelector(".main");
-    const detail2 = document.getElementById("detail");
-    if (main2) main2.scrollTop = tops.mainTop;
-    if (detail2) detail2.scrollTop = tops.detailTop;
-    window.scrollTo(0, tops.winTop);
-  });
+// Patch a single variant row in-place (no full re-render → no scroll jump)
+function _patchVariantRow(vid) {
+  const row = document.querySelector(`.variant[data-vid="${vid}"]`);
+  if (!row) return false;
+  const qty = ownedQty(vid);
+  const owned = qty > 0;
+  const wished = isWishlisted(vid);
+  // Update class
+  row.classList.toggle("owned", owned);
+  // Update badge
+  const badge = row.querySelector(".badge");
+  if (badge) badge.textContent = owned ? "✓ 擁有" : "—";
+  // Update actions
+  const actions = row.querySelector(".v-actions");
+  if (actions) {
+    const wish = actions.querySelector(".btn-wish");
+    if (wish) { wish.textContent = wished ? "★" : "☆"; wish.style.color = wished ? "var(--warn)" : "var(--muted)"; }
+    const btns = actions.querySelectorAll("button:not(.btn-wish)");
+    if (btns[0]) { btns[0].disabled = qty <= 0; btns[0].setAttribute("onclick", `setOwned('${vid}', ${qty - 1})`); }
+    if (btns[1]) { btns[1].setAttribute("onclick", `setOwned('${vid}', ${qty + 1})`); }
+    const input = actions.querySelector(".vqty");
+    if (input) input.value = qty;
+  }
+  // Update header owned count
+  const sub = document.querySelector(".detail .sub");
+  if (sub && selected && selected.type === "product") {
+    const p = PRODUCTS[selected.id];
+    if (p) {
+      const ownedV = p.variants.filter(v => isOwned(v.id)).length;
+      sub.textContent = `擁有 ${ownedV}/${p.variants.length} 陀螺`;
+    }
+  }
+  return true;
 }
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
@@ -2195,7 +2208,7 @@ function renderProductDetail(p) {
     const qty = ownedQty(v.id);
     const owned = qty > 0;
     const wished = isWishlisted(v.id);
-    return `<div class="variant ${owned ? "owned" : ""}">
+    return `<div class="variant ${owned ? "owned" : ""}" data-vid="${v.id}">
       <div class="v-top">
         <div style="min-width:0;">
           <div class="vbey">${cnDisplay}</div>
