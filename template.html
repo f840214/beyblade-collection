@@ -875,6 +875,14 @@ function tierStripMarkers(s) {
     .replace(/^輔助戰\s+/, "")
     .trim();
 }
+// CX 組合名比對：bladeName 可能含多餘段 (e.g. "帝皇威能·H")，
+// 排行榜只寫 chip+metal 名 (e.g. "帝皇威能")，所以也要比前綴
+function tierCxNameMatch(composedName, cand) {
+  if (composedName === cand) return true;
+  // 前綴比對: "帝皇威能·H".startsWith("帝皇威能") 且下一字元是 "·" 或字串結尾
+  if (composedName.startsWith(cand) && (composedName.length === cand.length || composedName[cand.length] === "·")) return true;
+  return false;
+}
 
 // 把 chi 欄位的所有可能名字 (港譯/台譯/aka) 列出來，全部去掉 "\"
 function bladeAllNames(code) {
@@ -926,7 +934,7 @@ function tierIsBladeOwned(name, ownedBlades) {
       if (!code.includes(".") && !code.includes("/")) {
         if (bladeAllNames(code).includes(cand)) return true;
       } else {
-        if (bladeName(code) === cand) return true;
+        if (tierCxNameMatch(bladeName(code), cand)) return true;
         if (seg === null) seg = findCxSegmentByName(cand) || false;
         if (seg && code.split(".").includes(seg.code)) return true;
       }
@@ -960,7 +968,7 @@ function tierBladeMatch(name) {
     for (const v of VARIANTS) {
       if (isEmptyPart(v.blade)) continue;
       if (!v.blade.includes(".") && !v.blade.includes("/")) continue;
-      if (bladeName(v.blade) === cand) return { kind: "product", id: v.productId };
+      if (tierCxNameMatch(bladeName(v.blade), cand)) return { kind: "product", id: v.productId };
     }
   }
   // 3. CX 段名 fallback (e.g. 狂怒→metal Rg, W→assist W) — 找一個含此段的商品

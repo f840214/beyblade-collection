@@ -23,6 +23,12 @@
             "stat": ["4-"],
             "desc": "薄且順滑的形狀減輕空氣抵抗，維持迴轉力。",
             "attr": ["sta","right","bbb"]
+        },
+        "O": {
+            "names": {"jap":"アウター", "eng":"Outer"},
+            "stat": [""],
+            "desc": "外側が厚い5枚刃形状で遠心力を高める。",
+            "attr": ["sta","right"]
         }
     },
     "assist": {
@@ -232,6 +238,11 @@
             "names": {"jap":"ペルセウス", "eng":"Perseus", "chi":"英仙"},
             "stat": ["2-"],
             "attr": ["right","mfb"]
+        },
+        "Br": {
+            "names": {"jap":"ブラキオ", "eng":"Brakio", "chi":"腕龍"},
+            "stat": [""],
+            "attr": ["right"]
         }
     },
     "metal": {
@@ -258,6 +269,12 @@
             "stat": ["30-"],
             "desc": "高撞擊性能的重量級五枚刃，一併持有重心偏側的大型刃以提高重擊性能。",
             "attr": ["att","right"]
+        },
+        "Wp": {
+            "names": {"jap":"ウィップ", "eng":"Whip", "chi":"長鞭"},
+            "stat": [""],
+            "desc": "なめらかな円弧状の4枚刃で相手の攻撃をいなす設計。",
+            "attr": ["sta","right"]
         }
     },
     "main": {
