@@ -807,23 +807,12 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   if (!_applyingRemote && typeof scheduleSyncPush === "function") scheduleSyncPush();
 }
-function _saveScroll() {
-  const main = document.querySelector(".main");
-  return { mainTop: main ? main.scrollTop : 0, winTop: window.scrollY };
-}
-function _restoreScroll(s) {
-  const main = document.querySelector(".main");
-  if (main) main.scrollTop = s.mainTop;
-  window.scrollTo(0, s.winTop);
-}
 function setOwned(vid, qty) {
   qty = Math.max(0, parseInt(qty) || 0);
   if (qty <= 0) delete state.owned[vid];
   else state.owned[vid] = qty;
   saveState();
-  const s = _saveScroll();
-  render();
-  _restoreScroll(s);
+  _renderKeepScroll();
 }
 function isOwned(vid) { return (state.owned[vid] || 0) > 0; }
 function ownedQty(vid) { return state.owned[vid] || 0; }
@@ -832,9 +821,30 @@ function toggleWishlist(vid) {
   if (state.wishlist[vid]) delete state.wishlist[vid];
   else state.wishlist[vid] = 1;
   saveState();
-  const s = _saveScroll();
+  _renderKeepScroll();
+}
+function _renderKeepScroll() {
+  // Collect scroll positions from all possible scroll containers
+  const main = document.querySelector(".main");
+  const detail = document.getElementById("detail");
+  const tops = {
+    mainTop: main ? main.scrollTop : 0,
+    detailTop: detail ? detail.scrollTop : 0,
+    winTop: window.scrollY,
+  };
   render();
-  _restoreScroll(s);
+  // Restore synchronously
+  if (main) main.scrollTop = tops.mainTop;
+  if (detail) detail.scrollTop = tops.detailTop;
+  window.scrollTo(0, tops.winTop);
+  // Also restore after browser layout pass (Safari/iOS needs this)
+  requestAnimationFrame(() => {
+    const main2 = document.querySelector(".main");
+    const detail2 = document.getElementById("detail");
+    if (main2) main2.scrollTop = tops.mainTop;
+    if (detail2) detail2.scrollTop = tops.detailTop;
+    window.scrollTo(0, tops.winTop);
+  });
 }
 function toggleTheme() {
   const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
