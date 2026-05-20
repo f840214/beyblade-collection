@@ -196,6 +196,12 @@
   .product-card .pc-img {
     width: 100%; aspect-ratio: 1; object-fit: contain;
   }
+  .product-card .pc-noimg {
+    width: 100%; aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel2); border-radius: 8px;
+    color: var(--muted); font-size: 12px;
+  }
   .product-card .pc-foot {
     display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted);
   }
@@ -1318,7 +1324,7 @@ function renderProductGrid(q) {
           ${badgeHtml}
         </div>
         <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
-        <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.style.display='none'">
+        <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.outerHTML='<div class=\\'pc-noimg\\'>暫無圖片</div>'">
         <div class="pc-foot">
           <span>${ownedV}/${total}</span>
           <div class="pc-bar"><div class="pc-bar-fill" style="width:${pct}%"></div></div>
