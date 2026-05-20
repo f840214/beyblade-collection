@@ -193,6 +193,17 @@
   .product-card .pc-badge.done { background: var(--owned); color: #002b14; }
   .product-card .pc-badge.partial { background: var(--warn); color: #1a1a2e; }
   .product-card .pc-type { color: var(--muted); font-size: 11px; }
+  .product-card .pc-name { font-size: 12px; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-card .pc-coats { display: flex; gap: 4px; flex-wrap: wrap; }
+  .product-card .pc-coat {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10px; color: var(--muted); padding: 1px 6px;
+    background: var(--panel2); border-radius: 8px;
+  }
+  .product-card .pc-coat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
   .product-card .pc-img {
     width: 100%; aspect-ratio: 1; object-fit: contain;
   }
@@ -644,6 +655,14 @@ const PRODUCT_TYPE_NAMES = {
   "RB": "隨機補充包",
   "Lm": "限定",
 };
+const COAT_NAMES = {
+  black: "黑", blue: "藍", blueviolet: "藍紫", coral: "珊瑚",
+  crimson: "紅", darkorange: "橘", deepskyblue: "天藍", dodgerblue: "藍",
+  gold: "金", lightseagreen: "青綠", limegreen: "萊姆綠", mediumorchid: "紫",
+  mediumvioletred: "桃紅", royalblue: "寶藍", sienna: "棕", white: "白", yellow: "黃",
+};
+function coatName(c) { return COAT_NAMES[c] || c; }
+
 function productTypeName(code) {
   if (!code) return "";
   const parts = code.split(/\s+/);
@@ -1318,12 +1337,24 @@ function renderProductGrid(q) {
         ? `<span class="pc-badge partial">${ownedV}/${total}</span>`
         : "";
       const cls = ownedV > 0 ? "owned" : "";
+      const blades = [...new Set(p.variants
+        .map(v => isEmptyPart(v.blade) ? null : bladeName(v.blade))
+        .filter(Boolean))];
+      const nameStr = blades.length === 0 ? ""
+        : blades.length > 2 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
+        : blades.join("、");
+      const coats = [...new Set(p.variants.map(v => v.opts?.coat).filter(Boolean))];
+      const coatHtml = coats.length ? coats.map(c =>
+        `<span class="pc-coat" style="--coat:${c}"><span class="pc-coat-dot" style="background:${c}"></span>${coatName(c)}</span>`
+      ).join("") : "";
       cards.push(`<div class="product-card ${cls}" onclick="select('product','${p.id}')">
         <div class="pc-header">
           <span class="pc-code">${p.id}</span>
           ${badgeHtml}
         </div>
         <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
+        ${nameStr ? `<span class="pc-name">${nameStr}</span>` : ""}
+        ${coatHtml ? `<div class="pc-coats">${coatHtml}</div>` : ""}
         <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.outerHTML='<div class=\\'pc-noimg\\'>暫無圖片</div>'">
         <div class="pc-foot">
           <span>${ownedV}/${total}</span>

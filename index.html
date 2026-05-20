@@ -193,6 +193,17 @@
   .product-card .pc-badge.done { background: var(--owned); color: #002b14; }
   .product-card .pc-badge.partial { background: var(--warn); color: #1a1a2e; }
   .product-card .pc-type { color: var(--muted); font-size: 11px; }
+  .product-card .pc-name { font-size: 12px; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-card .pc-coats { display: flex; gap: 4px; flex-wrap: wrap; }
+  .product-card .pc-coat {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10px; color: var(--muted); padding: 1px 6px;
+    background: var(--panel2); border-radius: 8px;
+  }
+  .product-card .pc-coat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
   .product-card .pc-img {
     width: 100%; aspect-ratio: 1; object-fit: contain;
   }
@@ -442,7 +453,7 @@
 </head>
 <body>
 <header>
-  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-20">v0.77</span></h1>
+  <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-20">v0.78</span></h1>
   <div class="stats" id="stats">載入中…</div>
   <div class="actions">
     <button id="sync-btn" onclick="openSyncDialog()" title="同步到 Google Drive"><svg viewBox="0 0 48 48" width="14" height="14" style="vertical-align:-2px; margin-right:2px;" aria-hidden="true"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg><span id="sync-btn-label">同步</span></button>
@@ -644,6 +655,14 @@ const PRODUCT_TYPE_NAMES = {
   "RB": "隨機補充包",
   "Lm": "限定",
 };
+const COAT_NAMES = {
+  black: "黑", blue: "藍", blueviolet: "藍紫", coral: "珊瑚",
+  crimson: "紅", darkorange: "橘", deepskyblue: "天藍", dodgerblue: "藍",
+  gold: "金", lightseagreen: "青綠", limegreen: "萊姆綠", mediumorchid: "紫",
+  mediumvioletred: "桃紅", royalblue: "寶藍", sienna: "棕", white: "白", yellow: "黃",
+};
+function coatName(c) { return COAT_NAMES[c] || c; }
+
 function productTypeName(code) {
   if (!code) return "";
   const parts = code.split(/\s+/);
@@ -1318,12 +1337,24 @@ function renderProductGrid(q) {
         ? `<span class="pc-badge partial">${ownedV}/${total}</span>`
         : "";
       const cls = ownedV > 0 ? "owned" : "";
+      const blades = [...new Set(p.variants
+        .map(v => isEmptyPart(v.blade) ? null : bladeName(v.blade))
+        .filter(Boolean))];
+      const nameStr = blades.length === 0 ? ""
+        : blades.length > 2 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
+        : blades.join("、");
+      const coats = [...new Set(p.variants.map(v => v.opts?.coat).filter(Boolean))];
+      const coatHtml = coats.length ? coats.map(c =>
+        `<span class="pc-coat" style="--coat:${c}"><span class="pc-coat-dot" style="background:${c}"></span>${coatName(c)}</span>`
+      ).join("") : "";
       cards.push(`<div class="product-card ${cls}" onclick="select('product','${p.id}')">
         <div class="pc-header">
           <span class="pc-code">${p.id}</span>
           ${badgeHtml}
         </div>
         <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
+        ${nameStr ? `<span class="pc-name">${nameStr}</span>` : ""}
+        ${coatHtml ? `<div class="pc-coats">${coatHtml}</div>` : ""}
         <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.outerHTML='<div class=\\'pc-noimg\\'>暫無圖片</div>'">
         <div class="pc-foot">
           <span>${ownedV}/${total}</span>
