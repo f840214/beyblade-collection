@@ -2249,7 +2249,12 @@ function renderProductDetail(p) {
 function batchOwn(pid, own) {
   const p = PRODUCTS[pid]; if (!p) return;
   p.variants.forEach(v => { if (own) state.owned[v.id] = 1; else delete state.owned[v.id]; });
-  saveState(); render();
+  saveState();
+  // Patch each variant row in-place
+  let allPatched = true;
+  p.variants.forEach(v => { if (!_patchVariantRow(v.id)) allPatched = false; });
+  if (!allPatched) render();
+  else { renderStats(); renderList(); }
 }
 
 function renderPartDetail(type, code) {
