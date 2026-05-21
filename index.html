@@ -538,7 +538,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.90</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.91</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -1788,12 +1788,22 @@ function renderBuildEditor(id) {
 async function shareBuild(id) {
   const b = getBuild(id); if (!b) return;
   const op = ownedParts();
-  const W = 800, PAD = 40;
+  const W = 800, PAD = 40, IMGSIZE = 80;
   const INNER = W - PAD * 2;
   const FFAM = `-apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif`;
   const C = { bg: "#0f1115", panel: "#1f232c", text: "#e6e9ef", muted: "#8a93a3", accent: "#4ea1ff", owned: "#2ecc71", missing: "#ff6b6b", border: "#2a2f3a" };
 
-  // Gather part info
+  // Helper: load image, return null on error
+  function loadImg(src) {
+    return new Promise(resolve => {
+      const img = new Image(); img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
+  // Gather part info + image sources
   const parts = [];
   if (b.cx) {
     const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
@@ -1804,45 +1814,64 @@ async function shareBuild(id) {
       const inf = (cx[cat] || {})[code] || {};
       const cn = inf.names ? (preferredChi(inf.names.chi) || inf.names.eng || "") : "";
       const ownSet = cat === "main" ? new Set([...cxSegs.main, ...cxSegs.metal]) : cxSegs[cat];
-      parts.push({ label, name: cn || code, code: cn ? code : "", owned: ownSet && ownSet.has(code) });
+      parts.push({ label, name: cn || code, code: cn ? code : "", owned: ownSet && ownSet.has(code),
+        imgSrc: `blades/CX/${cat}/${encodeURIComponent(code)}.png` });
     });
   } else if (b.blade) {
     const cn = bladeName(b.blade);
-    parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade) });
+    const src = bladeImageSrc(b.blade);
+    if (!src && b.blade.includes(".")) {
+      const segs = cxBladeSegments(b.blade).filter(Boolean);
+      const head = segs.find(s => s.cat === "chip") || segs[0];
+      parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade),
+        imgSrc: head ? head.src : "" });
+    } else {
+      parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade),
+        imgSrc: src || "" });
+    }
   }
-  if (b.ratchet) parts.push({ label: "固鎖", name: b.ratchet, code: "", owned: op.ratchets.has(b.ratchet) });
+  if (b.ratchet) parts.push({ label: "固鎖", name: b.ratchet, code: "", owned: op.ratchets.has(b.ratchet),
+    imgSrc: ratchetImageSrc(b.ratchet) });
   if (b.bit) {
     const inf = bitInfo(b.bit);
     const cn = inf.names ? preferredChi(inf.names.chi) : "";
-    parts.push({ label: "軸", name: cn || b.bit, code: cn ? b.bit : "", owned: op.bits.has(b.bit) });
+    parts.push({ label: "軸", name: cn || b.bit, code: cn ? b.bit : "", owned: op.bits.has(b.bit),
+      imgSrc: bitImageSrc(b.bit) });
   }
 
+  // Preload all images
+  const imgs = await Promise.all(parts.map(p => p.imgSrc ? loadImg(p.imgSrc) : Promise.resolve(null)));
+
   // Layout
-  const ROWH = 44, ROWGAP = 6;
-  const titleH = 50, statusH = 36, noteH = b.note ? 40 : 0;
-  const bodyH = titleH + statusH + parts.length * (ROWH + ROWGAP) + noteH + 30;
+  const ROWH = IMGSIZE + 20, ROWGAP = 8;
+  const titleH = 56, statusH = 36, noteH = b.note ? 44 : 0, footerH = 30;
+  const bodyH = titleH + statusH + parts.length * (ROWH + ROWGAP) + noteH + footerH;
   const H = bodyH + PAD * 2;
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
 
+  // Rounded rect helper
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
   // Background
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = C.panel;
-  ctx.beginPath();
-  const r = 16, x1 = PAD - 10, y1 = PAD - 10, x2 = W - PAD + 10, y2 = H - PAD + 10;
-  ctx.moveTo(x1 + r, y1); ctx.lineTo(x2 - r, y1); ctx.quadraticCurveTo(x2, y1, x2, y1 + r);
-  ctx.lineTo(x2, y2 - r); ctx.quadraticCurveTo(x2, y2, x2 - r, y2);
-  ctx.lineTo(x1 + r, y2); ctx.quadraticCurveTo(x1, y2, x1, y2 - r);
-  ctx.lineTo(x1, y1 + r); ctx.quadraticCurveTo(x1, y1, x1 + r, y1);
-  ctx.fill();
+  roundRect(PAD - 10, PAD - 10, INNER + 20, H - PAD * 2 + 20, 16);
+  ctx.fillStyle = C.panel; ctx.fill();
 
   let y = PAD;
 
   // Title
   ctx.font = `700 28px ${FFAM}`; ctx.fillStyle = C.text;
-  ctx.fillText(b.name || "未命名配置", PAD, y + 30);
+  ctx.fillText(b.name || "未命名配置", PAD, y + 34);
   y += titleH;
 
   // Status
@@ -1853,51 +1882,64 @@ async function shareBuild(id) {
   ctx.fillText(statusText, PAD, y + 20);
   y += statusH;
 
-  // Parts
-  parts.forEach(p => {
+  // Parts with images
+  parts.forEach((p, i) => {
+    const img = imgs[i];
     // Row bg
-    ctx.fillStyle = p.owned ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.03)";
-    ctx.beginPath();
-    const ry = y, rh = ROWH, rr = 8;
-    ctx.moveTo(PAD + rr, ry); ctx.lineTo(PAD + INNER - rr, ry); ctx.quadraticCurveTo(PAD + INNER, ry, PAD + INNER, ry + rr);
-    ctx.lineTo(PAD + INNER, ry + rh - rr); ctx.quadraticCurveTo(PAD + INNER, ry + rh, PAD + INNER - rr, ry + rh);
-    ctx.lineTo(PAD + rr, ry + rh); ctx.quadraticCurveTo(PAD, ry + rh, PAD, ry + rh - rr);
-    ctx.lineTo(PAD, ry + rr); ctx.quadraticCurveTo(PAD, ry, PAD + rr, ry);
-    ctx.fill();
-    // Border
+    roundRect(PAD, y, INNER, ROWH, 10);
+    ctx.fillStyle = p.owned ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.03)"; ctx.fill();
     ctx.strokeStyle = p.owned ? "rgba(46,204,113,0.3)" : C.border; ctx.lineWidth = 1; ctx.stroke();
+
+    // Image
+    const imgX = PAD + 10, imgY = y + 10;
+    if (img) {
+      ctx.save();
+      roundRect(imgX, imgY, IMGSIZE, IMGSIZE, 8); ctx.clip();
+      ctx.drawImage(img, imgX, imgY, IMGSIZE, IMGSIZE);
+      ctx.restore();
+    } else {
+      roundRect(imgX, imgY, IMGSIZE, IMGSIZE, 8);
+      ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fill();
+    }
+
+    const textX = PAD + 10 + IMGSIZE + 14;
 
     // Label
     ctx.font = `600 12px ${FFAM}`; ctx.fillStyle = C.accent;
-    ctx.fillText(p.label, PAD + 12, y + 27);
+    ctx.fillText(p.label, textX, y + 32);
 
     // Name
-    ctx.font = `600 16px ${FFAM}`; ctx.fillStyle = C.text;
-    const labelW = ctx.measureText(p.label).width;
-    ctx.fillText(p.name, PAD + 12 + labelW + 12, y + 27);
+    ctx.font = `700 18px ${FFAM}`; ctx.fillStyle = C.text;
+    ctx.fillText(p.name, textX, y + 56);
 
     // Code
     if (p.code) {
-      ctx.font = `11px ui-monospace, SFMono-Regular, Menlo, monospace`; ctx.fillStyle = C.muted;
-      const nameW = ctx.measureText(p.name).width;
-      ctx.fillText(p.code, PAD + 12 + labelW + 12 + nameW + 8, y + 27);
+      ctx.font = `12px ui-monospace, SFMono-Regular, Menlo, monospace`; ctx.fillStyle = C.muted;
+      ctx.fillText(p.code, textX, y + 76);
     }
 
     // Owned indicator
-    ctx.font = `11px ${FFAM}`; ctx.fillStyle = p.owned ? C.owned : C.missing;
     const tag = p.owned ? "已擁有" : "未擁有";
+    ctx.font = `12px ${FFAM}`; ctx.fillStyle = p.owned ? C.owned : C.missing;
     const tw = ctx.measureText(tag).width;
-    ctx.fillText(tag, PAD + INNER - 12 - tw, y + 27);
+    ctx.fillText(tag, PAD + INNER - 14 - tw, y + 32);
 
     y += ROWH + ROWGAP;
   });
 
   // Note
   if (b.note) {
-    y += 6;
+    y += 4;
     ctx.font = `13px ${FFAM}`; ctx.fillStyle = C.muted;
     ctx.fillText(b.note, PAD, y + 16);
+    y += noteH;
   }
+
+  // Footer
+  ctx.font = `11px ${FFAM}`; ctx.fillStyle = C.muted;
+  ctx.textAlign = "right";
+  ctx.fillText("Beyblade X 收藏管理", PAD + INNER, y + 16);
+  ctx.textAlign = "left";
 
   // Export
   canvas.toBlob(async blob => {
@@ -1910,7 +1952,6 @@ async function shareBuild(id) {
         }
       } catch (e) { if (e.name === "AbortError") return; }
     }
-    // Fallback: download
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `${b.name || "build"}.png`;
     a.click(); URL.revokeObjectURL(url);
