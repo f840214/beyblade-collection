@@ -268,14 +268,13 @@
     margin-left: auto; display: flex; align-items: center; gap: 4px;
   }
   .part-btn {
-    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border);
-    background: var(--panel2); color: var(--text); font-size: 14px; cursor: pointer;
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 16px; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; padding: 0;
     line-height: 1; flex-shrink: 0;
   }
   .part-btn:hover { border-color: var(--accent); color: var(--accent); }
   .part-btn:disabled { opacity: 0.3; cursor: default; }
-  .part-btn.lg { width: 32px; height: 32px; font-size: 16px; }
   .part-total {
     min-width: 20px; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted);
   }
@@ -554,7 +553,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.92</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.93</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -1090,6 +1089,7 @@ function _patchLoosePart(type, code) {
 // ============================================================
 let activeTab = "products";
 let prevTab = null;
+let prevSelected = null;
 let selected = null; // { type: "product"|"blade"|"ratchet"|"bit", id }
 let filterOpts = {
   ownedOnly: false,
@@ -2069,12 +2069,19 @@ function pickPart(code) {
 }
 
 function goBack() {
-  // 如果有來源 tab，直接回去（跳過中間列表）
+  // 如果有來源 tab，直接回去並恢復之前的選擇
   if (prevTab && prevTab !== activeTab) {
     const backTo = prevTab;
+    const backSel = prevSelected;
     prevTab = null;
-    selected = null;
-    switchTab(backTo);
+    prevSelected = null;
+    activeTab = backTo;
+    selected = backSel || null;
+    document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === backTo));
+    // 只更新 detail，不重建列表（避免閃爍）
+    renderDetail();
+    const showMain = activeTab === "mine" || activeTab === "tier" || activeTab === "news" || (!!selected && (activeTab === "products" || activeTab === "parts" || activeTab === "builds"));
+    document.body.classList.toggle("show-detail", showMain);
     return;
   }
   // 如果有選中項目，取消選中（回到當前 tab 列表）
@@ -2485,7 +2492,7 @@ function renderPartDetail(type, code) {
       <div style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
         ${sources.map(v => {
           const q = ownedQty(v.id);
-          return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:${q > 0 ? "rgba(46,204,113,0.08)" : "var(--panel2)"}; cursor:pointer;" onclick="select('product','${v.productId}')">
+          return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:${q > 0 ? "rgba(46,204,113,0.08)" : "var(--panel2)"}; cursor:pointer;" onclick="showProductModal('${v.productId}')">
             <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"};">${q > 0 ? "●" : "○"}</span>
             <span style="flex:1; ${q > 0 ? "color:var(--text)" : "color:var(--muted)"}">${v.productId}</span>
             <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"}; font-weight:600;">${q > 0 ? `×${q}` : "—"}</span>
@@ -3014,6 +3021,16 @@ function showModal(title, bodyHtml, actions) {
   document.getElementById("modal-bg").classList.add("open");
 }
 function closeModal() { document.getElementById("modal-bg").classList.remove("open"); }
+
+function showProductModal(pid) {
+  const p = PRODUCTS[pid]; if (!p) return;
+  // 去掉 h2 避免跟 modal title 重複
+  const html = renderProductDetail(p).replace(/<h2>[\s\S]*?<\/h2>/, "");
+  showModal(p.id + " " + productTypeName(p.type), html, [
+    { label: "前往商品頁", action: () => { closeModal(); switchTab("products","parts"); select("product", pid); } },
+    { label: "關閉", action: closeModal },
+  ]);
+}
 
 // 漢堡選單
 function toggleMoreMenu(e) {
