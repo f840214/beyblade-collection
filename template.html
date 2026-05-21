@@ -724,6 +724,16 @@ function cxBladeSegments(code) {
 function productImageSrc(pid) {
   return `products/${pid.replace(/-/g, "")}@1.png`;
 }
+function productPrice(pid) {
+  if (!newsState.data) return null;
+  const prods = newsProducts(newsState.data);
+  const match = prods.find(p => p.code === pid);
+  return match ? match.price : null;
+}
+function priceToNum(priceStr) {
+  if (!priceStr) return 0;
+  return parseInt(priceStr.replace(/[^0-9]/g, "")) || 0;
+}
 
 // 來源資料用 "/" 表示「該位置沒有零件」(例如單售零件包)
 // CX 還會用 "/./.X" 形式; 固鎖也用 "=" 表示「沒有固鎖」(例如 "Em.Mg.H = Op")
@@ -1755,6 +1765,7 @@ function renderBuildEditor(id) {
              oninput="updateBuildField('${id}','name', this.value)"
              style="flex:1; min-width:160px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
       <button onclick="duplicateBuild('${id}')">複製</button>
+      <button onclick="shareBuild('${id}')">分享</button>
       <button class="danger" onclick="deleteBuild('${id}')">刪除</button>
     </div>
     <div style="margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1772,6 +1783,138 @@ function renderBuildEditor(id) {
               oninput="updateBuildField('${id}','note', this.value)"
               style="width:100%; min-height:60px; margin-top:14px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px; font-family:inherit;">${(b.note || '').replace(/</g, '&lt;')}</textarea>
   </div>`;
+}
+
+async function shareBuild(id) {
+  const b = getBuild(id); if (!b) return;
+  const op = ownedParts();
+  const W = 800, PAD = 40;
+  const INNER = W - PAD * 2;
+  const FFAM = `-apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif`;
+  const C = { bg: "#0f1115", panel: "#1f232c", text: "#e6e9ef", muted: "#8a93a3", accent: "#4ea1ff", owned: "#2ecc71", missing: "#ff6b6b", border: "#2a2f3a" };
+
+  // Gather part info
+  const parts = [];
+  if (b.cx) {
+    const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
+    const cxSegs = ownedCxSegments();
+    [["chip", "紋章"], ["main", "超越戰刃"], ["over", "鋼鐵戰刃"], ["assist", "輔助戰刃"]].forEach(([cat, label]) => {
+      const code = b[cat];
+      if (!code) return;
+      const inf = (cx[cat] || {})[code] || {};
+      const cn = inf.names ? (preferredChi(inf.names.chi) || inf.names.eng || "") : "";
+      const ownSet = cat === "main" ? new Set([...cxSegs.main, ...cxSegs.metal]) : cxSegs[cat];
+      parts.push({ label, name: cn || code, code: cn ? code : "", owned: ownSet && ownSet.has(code) });
+    });
+  } else if (b.blade) {
+    const cn = bladeName(b.blade);
+    parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade) });
+  }
+  if (b.ratchet) parts.push({ label: "固鎖", name: b.ratchet, code: "", owned: op.ratchets.has(b.ratchet) });
+  if (b.bit) {
+    const inf = bitInfo(b.bit);
+    const cn = inf.names ? preferredChi(inf.names.chi) : "";
+    parts.push({ label: "軸", name: cn || b.bit, code: cn ? b.bit : "", owned: op.bits.has(b.bit) });
+  }
+
+  // Layout
+  const ROWH = 44, ROWGAP = 6;
+  const titleH = 50, statusH = 36, noteH = b.note ? 40 : 0;
+  const bodyH = titleH + statusH + parts.length * (ROWH + ROWGAP) + noteH + 30;
+  const H = bodyH + PAD * 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = C.panel;
+  ctx.beginPath();
+  const r = 16, x1 = PAD - 10, y1 = PAD - 10, x2 = W - PAD + 10, y2 = H - PAD + 10;
+  ctx.moveTo(x1 + r, y1); ctx.lineTo(x2 - r, y1); ctx.quadraticCurveTo(x2, y1, x2, y1 + r);
+  ctx.lineTo(x2, y2 - r); ctx.quadraticCurveTo(x2, y2, x2 - r, y2);
+  ctx.lineTo(x1 + r, y2); ctx.quadraticCurveTo(x1, y2, x1, y2 - r);
+  ctx.lineTo(x1, y1 + r); ctx.quadraticCurveTo(x1, y1, x1 + r, y1);
+  ctx.fill();
+
+  let y = PAD;
+
+  // Title
+  ctx.font = `700 28px ${FFAM}`; ctx.fillStyle = C.text;
+  ctx.fillText(b.name || "未命名配置", PAD, y + 30);
+  y += titleH;
+
+  // Status
+  const status = buildStatus(b);
+  const statusText = status.need === 0 ? "尚未選擇零件" : status.complete ? "✓ 全部擁有，可組裝" : `缺 ${status.missing} 件 / ${status.need}`;
+  ctx.font = `600 14px ${FFAM}`;
+  ctx.fillStyle = status.complete ? C.owned : status.need === 0 ? C.muted : C.missing;
+  ctx.fillText(statusText, PAD, y + 20);
+  y += statusH;
+
+  // Parts
+  parts.forEach(p => {
+    // Row bg
+    ctx.fillStyle = p.owned ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.03)";
+    ctx.beginPath();
+    const ry = y, rh = ROWH, rr = 8;
+    ctx.moveTo(PAD + rr, ry); ctx.lineTo(PAD + INNER - rr, ry); ctx.quadraticCurveTo(PAD + INNER, ry, PAD + INNER, ry + rr);
+    ctx.lineTo(PAD + INNER, ry + rh - rr); ctx.quadraticCurveTo(PAD + INNER, ry + rh, PAD + INNER - rr, ry + rh);
+    ctx.lineTo(PAD + rr, ry + rh); ctx.quadraticCurveTo(PAD, ry + rh, PAD, ry + rh - rr);
+    ctx.lineTo(PAD, ry + rr); ctx.quadraticCurveTo(PAD, ry, PAD + rr, ry);
+    ctx.fill();
+    // Border
+    ctx.strokeStyle = p.owned ? "rgba(46,204,113,0.3)" : C.border; ctx.lineWidth = 1; ctx.stroke();
+
+    // Label
+    ctx.font = `600 12px ${FFAM}`; ctx.fillStyle = C.accent;
+    ctx.fillText(p.label, PAD + 12, y + 27);
+
+    // Name
+    ctx.font = `600 16px ${FFAM}`; ctx.fillStyle = C.text;
+    const labelW = ctx.measureText(p.label).width;
+    ctx.fillText(p.name, PAD + 12 + labelW + 12, y + 27);
+
+    // Code
+    if (p.code) {
+      ctx.font = `11px ui-monospace, SFMono-Regular, Menlo, monospace`; ctx.fillStyle = C.muted;
+      const nameW = ctx.measureText(p.name).width;
+      ctx.fillText(p.code, PAD + 12 + labelW + 12 + nameW + 8, y + 27);
+    }
+
+    // Owned indicator
+    ctx.font = `11px ${FFAM}`; ctx.fillStyle = p.owned ? C.owned : C.missing;
+    const tag = p.owned ? "已擁有" : "未擁有";
+    const tw = ctx.measureText(tag).width;
+    ctx.fillText(tag, PAD + INNER - 12 - tw, y + 27);
+
+    y += ROWH + ROWGAP;
+  });
+
+  // Note
+  if (b.note) {
+    y += 6;
+    ctx.font = `13px ${FFAM}`; ctx.fillStyle = C.muted;
+    ctx.fillText(b.note, PAD, y + 16);
+  }
+
+  // Export
+  canvas.toBlob(async blob => {
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([blob], "build.png", { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: b.name || "Beyblade X 配置" });
+          return;
+        }
+      } catch (e) { if (e.name === "AbortError") return; }
+    }
+    // Fallback: download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${b.name || "build"}.png`;
+    a.click(); URL.revokeObjectURL(url);
+  }, "image/png");
 }
 
 function toggleBuildCx(id, on) {
@@ -2089,7 +2232,7 @@ function renderCollection() {
           <img class="mine-prod-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.style.display='none'">
           <div class="mine-prod-info">
             <div class="mine-prod-title"><span class="mine-prod-id">${p.id}</span> ${nameStr}</div>
-            <div class="mine-prod-meta">${productTypeName(p.type)} · ${ownedV}/${total}</div>
+            <div class="mine-prod-meta">${productTypeName(p.type)} · ${ownedV}/${total}${(() => { const pr = productPrice(p.id); return pr ? ` · ${pr}` : ""; })()}</div>
           </div>
           <span class="mine-prod-status ${done ? "complete" : "partial"}">${done ? "✓ 完成" : `${ownedV}/${total}`}</span>
           <div class="mine-prod-bar-bottom"><div class="fill" style="width:${pct}%"></div></div>
@@ -2145,9 +2288,16 @@ function renderCollection() {
     <button class="${mineView === 'table' ? 'primary' : ''}" onclick="setMineView('table')">表格</button>
   </div>`;
 
-  if (mineView === "table") return `<div>${toggle}${renderCollectionTable(q)}</div>`;
+  // 計算總花費
+  const totalCost = ownedProducts.reduce((sum, p) => sum + priceToNum(productPrice(p.id)), 0);
+  const costHtml = totalCost > 0 ? `<div style="margin-bottom:14px; display:flex; gap:8px; flex-wrap:wrap;">
+    <span class="stat-chip">商品 <span class="stat-num">${ownedProducts.length}</span></span>
+    <span class="stat-chip">估計花費 <span class="stat-num">¥${totalCost.toLocaleString()}</span></span>
+  </div>` : "";
 
-  return `<div>${toggle}
+  if (mineView === "table") return `<div>${toggle}${costHtml}${renderCollectionTable(q)}</div>`;
+
+  return `<div>${toggle}${costHtml}
     <h2 id="mine-products" class="mine-sec-head">陀螺商品 <span class="pill" style="font-size:12px;">${filteredProds.length}</span></h2>
     <div class="mine-prod-list">${productsHtml}</div>
     ${bladeSec}
@@ -2255,7 +2405,7 @@ function renderProductDetail(p) {
   }).join("");
   return `<div>
     <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span></h2>
-    <div class="sub">擁有 ${ownedV}/${p.variants.length} 陀螺</div>
+    <div class="sub">擁有 ${ownedV}/${p.variants.length} 陀螺${(() => { const pr = productPrice(p.id); return pr ? ` · ${pr}` : ""; })()}</div>
     <div class="prod-img-wrap">
       <img class="prod-img" src="${productImageSrc(p.id)}" alt="${p.id}"
            loading="lazy" onerror="this.parentElement.style.display='none'">
