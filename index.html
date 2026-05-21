@@ -260,10 +260,26 @@
   .item.owned { color: var(--text); }
   .item.owned .name { color: var(--owned); }
   .item .qty {
-    margin-left: auto; font-size: 11px; color: var(--muted);
+    font-size: 11px; color: var(--muted);
     background: var(--panel2); padding: 1px 6px; border-radius: 10px;
   }
   .item.owned .qty { background: rgba(46,204,113,0.15); color: var(--owned); }
+  .item .part-actions {
+    margin-left: auto; display: flex; align-items: center; gap: 4px;
+  }
+  .part-btn {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 14px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    line-height: 1; flex-shrink: 0;
+  }
+  .part-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .part-btn:disabled { opacity: 0.3; cursor: default; }
+  .part-btn.lg { width: 32px; height: 32px; font-size: 16px; }
+  .part-total {
+    min-width: 20px; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted);
+  }
+  .item.owned .part-total { color: var(--owned); }
   .item .check { font-family: monospace; color: var(--muted); padding: 0 4px; border-radius: 50%; }
   .item.owned .check { color: var(--owned); }
   .item .check.toggleable { cursor: pointer; }
@@ -538,7 +554,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.91</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-21">v0.92</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -815,10 +831,19 @@ function loadState() {
       if (typeof s.updatedAt !== "number") s.updatedAt = 0;
       if (!s.prefs || typeof s.prefs !== "object") s.prefs = {};
       if (!s.wishlist || typeof s.wishlist !== "object") s.wishlist = {};
+      if (!s.looseParts || typeof s.looseParts !== "object") s.looseParts = {};
+      // 清除無效的負數散裝資料
+      for (const t of ["blade", "ratchet", "bit"]) {
+        if (s.looseParts[t]) {
+          for (const c of Object.keys(s.looseParts[t])) {
+            if (s.looseParts[t][c] <= 0) delete s.looseParts[t][c];
+          }
+        }
+      }
       return s;
     }
   } catch (e) {}
-  return { owned: {}, builds: [], updatedAt: 0, prefs: {}, wishlist: {} };
+  return { owned: {}, builds: [], updatedAt: 0, prefs: {}, wishlist: {}, looseParts: {} };
 }
 // 是否正在從 Drive 套用遠端資料 (套用過程不應該再回推)
 let _applyingRemote = false;
@@ -981,7 +1006,83 @@ function ownedParts() {
     if (!isEmptyPart(v.ratchet)) ratchets.add(v.ratchet);
     if (!isEmptyPart(v.bit))     bits.add(v.bit);
   });
+  // 加入散裝零件（正數增加，負數扣除）
+  const lp = state.looseParts || {};
+  Object.keys(lp.blade || {}).forEach(c => { if (lp.blade[c] > 0) blades.add(c); });
+  Object.keys(lp.ratchet || {}).forEach(c => { if (lp.ratchet[c] > 0) ratchets.add(c); });
+  Object.keys(lp.bit || {}).forEach(c => { if (lp.bit[c] > 0) bits.add(c); });
   return { blades, ratchets, bits };
+}
+
+function loosePartQty(type, code) {
+  return (state.looseParts && state.looseParts[type] && state.looseParts[type][code]) || 0;
+}
+function productPartQty(type, code) {
+  let n = 0;
+  const sources = PART_SOURCES[type][code] || [];
+  sources.forEach(v => { n += ownedQty(v.id); });
+  return n;
+}
+function totalPartQty(type, code) {
+  return productPartQty(type, code) + loosePartQty(type, code);
+}
+function setLoosePart(type, code, delta) {
+  if (!state.looseParts) state.looseParts = {};
+  if (!state.looseParts[type]) state.looseParts[type] = {};
+  const lq = loosePartQty(type, code) + delta;
+  if (lq < 0) return;
+  if (lq === 0) delete state.looseParts[type][code];
+  else state.looseParts[type][code] = lq;
+  saveState();
+  _patchLoosePart(type, code);
+  renderStats();
+}
+function _patchLoosePart(type, code) {
+  const lq = loosePartQty(type, code);
+  const tq = totalPartQty(type, code);
+  const ec = escapeAttr(code);
+  // Patch the part list row
+  const row = document.querySelector(`.item[data-ptype="${type}"][data-pcode="${CSS.escape(code)}"]`);
+  if (row) {
+    const actions = row.querySelector(".part-actions");
+    if (actions) {
+      actions.innerHTML =
+        `<button class="part-btn" onclick="event.stopPropagation(); setLoosePart('${type}','${ec}', -1)" ${lq === 0 ? 'disabled' : ""}>−</button>` +
+        `<span class="part-total">${lq}</span>` +
+        `<button class="part-btn" onclick="event.stopPropagation(); setLoosePart('${type}','${ec}', 1)">＋</button>`;
+    }
+    // Update owned state
+    const isO = tq > 0;
+    row.classList.toggle("owned", isO);
+    const check = row.querySelector(".check");
+    if (check) check.textContent = isO ? "●" : "○";
+  }
+  // Patch the detail view loose row
+  const detailLoose = document.getElementById("loose-part-ctrl");
+  if (detailLoose) {
+    detailLoose.style.background = lq > 0 ? "rgba(78,161,255,0.08)" : "var(--panel2)";
+    detailLoose.innerHTML =
+      `<span style="color:${lq > 0 ? "var(--accent)" : "var(--muted)"};">${lq > 0 ? "●" : "○"}</span>` +
+      `<span style="flex:1; color:var(--text);">散裝</span>` +
+      `<button class="part-btn" onclick="setLoosePart('${type}','${ec}', -1)" ${lq === 0 ? 'disabled' : ""}>−</button>` +
+      `<span style="min-width:20px; text-align:center; font-weight:600; color:${lq > 0 ? "var(--accent)" : "var(--muted)"};">${lq}</span>` +
+      `<button class="part-btn" onclick="setLoosePart('${type}','${ec}', 1)">＋</button>`;
+  }
+  // Patch total row
+  const qtyCard = document.getElementById("part-qty-card");
+  if (qtyCard) {
+    const totalRow = qtyCard.querySelector("[data-total]");
+    if (totalRow) {
+      totalRow.innerHTML = `<span style="flex:1; font-weight:600;">合計</span><span style="font-weight:700; font-size:15px; color:${tq > 0 ? "var(--owned)" : "var(--muted)"};">${tq}</span>`;
+    }
+  }
+  // Update detail owned pill
+  const detailPill = document.querySelector(".detail h2 .pill");
+  if (detailPill && selected && selected.type === type && selected.id === code) {
+    const totalOwned = tq > 0;
+    detailPill.className = `pill ${totalOwned ? "owned" : "missing"}`;
+    detailPill.textContent = totalOwned ? "已擁有" : "缺少";
+  }
 }
 
 // ============================================================
@@ -1657,11 +1758,18 @@ function renderPartList(q) {
               if (chip) thumb = `<img class="item-thumb" src="${chip.src}" loading="lazy" onerror="this.style.visibility='hidden'">`;
             }
           }
-          return `<div class="item ${cls}" onclick="select('${sec.key}','${escapeAttr(code)}')">
+          const lq = loosePartQty(sec.key, code);
+          const tq = totalPartQty(sec.key, code);
+          const ec = escapeAttr(code);
+          return `<div class="item ${cls}" data-ptype="${sec.key}" data-pcode="${code}" onclick="select('${sec.key}','${ec}')">
             <span class="check">${isO ? "●" : "○"}</span>
             ${thumb}
             <span class="name">${display}</span>
-            <span class="qty">${PART_SOURCES[sec.key][code].length}</span>
+            <span class="part-actions">
+              <button class="part-btn" onclick="event.stopPropagation(); setLoosePart('${sec.key}','${ec}', -1)" ${lq === 0 ? 'disabled' : ""}>−</button>
+              <span class="part-total">${lq}</span>
+              <button class="part-btn" onclick="event.stopPropagation(); setLoosePart('${sec.key}','${ec}', 1)">＋</button>
+            </span>
           </div>`;
         }).join("")}
       </div>
@@ -1765,7 +1873,6 @@ function renderBuildEditor(id) {
              oninput="updateBuildField('${id}','name', this.value)"
              style="flex:1; min-width:160px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;">
       <button onclick="duplicateBuild('${id}')">複製</button>
-      <button onclick="shareBuild('${id}')">分享</button>
       <button class="danger" onclick="deleteBuild('${id}')">刪除</button>
     </div>
     <div style="margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -1783,179 +1890,6 @@ function renderBuildEditor(id) {
               oninput="updateBuildField('${id}','note', this.value)"
               style="width:100%; min-height:60px; margin-top:14px; padding:8px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px; font-family:inherit;">${(b.note || '').replace(/</g, '&lt;')}</textarea>
   </div>`;
-}
-
-async function shareBuild(id) {
-  const b = getBuild(id); if (!b) return;
-  const op = ownedParts();
-  const W = 800, PAD = 40, IMGSIZE = 80;
-  const INNER = W - PAD * 2;
-  const FFAM = `-apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif`;
-  const C = { bg: "#0f1115", panel: "#1f232c", text: "#e6e9ef", muted: "#8a93a3", accent: "#4ea1ff", owned: "#2ecc71", missing: "#ff6b6b", border: "#2a2f3a" };
-
-  // Helper: load image, return null on error
-  function loadImg(src) {
-    return new Promise(resolve => {
-      const img = new Image(); img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = src;
-    });
-  }
-
-  // Gather part info + image sources
-  const parts = [];
-  if (b.cx) {
-    const cx = (DB.bladeDivided && DB.bladeDivided.CX) || {};
-    const cxSegs = ownedCxSegments();
-    [["chip", "紋章"], ["main", "超越戰刃"], ["over", "鋼鐵戰刃"], ["assist", "輔助戰刃"]].forEach(([cat, label]) => {
-      const code = b[cat];
-      if (!code) return;
-      const inf = (cx[cat] || {})[code] || {};
-      const cn = inf.names ? (preferredChi(inf.names.chi) || inf.names.eng || "") : "";
-      const ownSet = cat === "main" ? new Set([...cxSegs.main, ...cxSegs.metal]) : cxSegs[cat];
-      parts.push({ label, name: cn || code, code: cn ? code : "", owned: ownSet && ownSet.has(code),
-        imgSrc: `blades/CX/${cat}/${encodeURIComponent(code)}.png` });
-    });
-  } else if (b.blade) {
-    const cn = bladeName(b.blade);
-    const src = bladeImageSrc(b.blade);
-    if (!src && b.blade.includes(".")) {
-      const segs = cxBladeSegments(b.blade).filter(Boolean);
-      const head = segs.find(s => s.cat === "chip") || segs[0];
-      parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade),
-        imgSrc: head ? head.src : "" });
-    } else {
-      parts.push({ label: "戰刃", name: cn || b.blade, code: cn ? b.blade : "", owned: op.blades.has(b.blade),
-        imgSrc: src || "" });
-    }
-  }
-  if (b.ratchet) parts.push({ label: "固鎖", name: b.ratchet, code: "", owned: op.ratchets.has(b.ratchet),
-    imgSrc: ratchetImageSrc(b.ratchet) });
-  if (b.bit) {
-    const inf = bitInfo(b.bit);
-    const cn = inf.names ? preferredChi(inf.names.chi) : "";
-    parts.push({ label: "軸", name: cn || b.bit, code: cn ? b.bit : "", owned: op.bits.has(b.bit),
-      imgSrc: bitImageSrc(b.bit) });
-  }
-
-  // Preload all images
-  const imgs = await Promise.all(parts.map(p => p.imgSrc ? loadImg(p.imgSrc) : Promise.resolve(null)));
-
-  // Layout
-  const ROWH = IMGSIZE + 20, ROWGAP = 8;
-  const titleH = 56, statusH = 36, noteH = b.note ? 44 : 0, footerH = 30;
-  const bodyH = titleH + statusH + parts.length * (ROWH + ROWGAP) + noteH + footerH;
-  const H = bodyH + PAD * 2;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d");
-
-  // Rounded rect helper
-  function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  // Background
-  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
-  roundRect(PAD - 10, PAD - 10, INNER + 20, H - PAD * 2 + 20, 16);
-  ctx.fillStyle = C.panel; ctx.fill();
-
-  let y = PAD;
-
-  // Title
-  ctx.font = `700 28px ${FFAM}`; ctx.fillStyle = C.text;
-  ctx.fillText(b.name || "未命名配置", PAD, y + 34);
-  y += titleH;
-
-  // Status
-  const status = buildStatus(b);
-  const statusText = status.need === 0 ? "尚未選擇零件" : status.complete ? "✓ 全部擁有，可組裝" : `缺 ${status.missing} 件 / ${status.need}`;
-  ctx.font = `600 14px ${FFAM}`;
-  ctx.fillStyle = status.complete ? C.owned : status.need === 0 ? C.muted : C.missing;
-  ctx.fillText(statusText, PAD, y + 20);
-  y += statusH;
-
-  // Parts with images
-  parts.forEach((p, i) => {
-    const img = imgs[i];
-    // Row bg
-    roundRect(PAD, y, INNER, ROWH, 10);
-    ctx.fillStyle = p.owned ? "rgba(46,204,113,0.08)" : "rgba(255,255,255,0.03)"; ctx.fill();
-    ctx.strokeStyle = p.owned ? "rgba(46,204,113,0.3)" : C.border; ctx.lineWidth = 1; ctx.stroke();
-
-    // Image
-    const imgX = PAD + 10, imgY = y + 10;
-    if (img) {
-      ctx.save();
-      roundRect(imgX, imgY, IMGSIZE, IMGSIZE, 8); ctx.clip();
-      ctx.drawImage(img, imgX, imgY, IMGSIZE, IMGSIZE);
-      ctx.restore();
-    } else {
-      roundRect(imgX, imgY, IMGSIZE, IMGSIZE, 8);
-      ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fill();
-    }
-
-    const textX = PAD + 10 + IMGSIZE + 14;
-
-    // Label
-    ctx.font = `600 12px ${FFAM}`; ctx.fillStyle = C.accent;
-    ctx.fillText(p.label, textX, y + 32);
-
-    // Name
-    ctx.font = `700 18px ${FFAM}`; ctx.fillStyle = C.text;
-    ctx.fillText(p.name, textX, y + 56);
-
-    // Code
-    if (p.code) {
-      ctx.font = `12px ui-monospace, SFMono-Regular, Menlo, monospace`; ctx.fillStyle = C.muted;
-      ctx.fillText(p.code, textX, y + 76);
-    }
-
-    // Owned indicator
-    const tag = p.owned ? "已擁有" : "未擁有";
-    ctx.font = `12px ${FFAM}`; ctx.fillStyle = p.owned ? C.owned : C.missing;
-    const tw = ctx.measureText(tag).width;
-    ctx.fillText(tag, PAD + INNER - 14 - tw, y + 32);
-
-    y += ROWH + ROWGAP;
-  });
-
-  // Note
-  if (b.note) {
-    y += 4;
-    ctx.font = `13px ${FFAM}`; ctx.fillStyle = C.muted;
-    ctx.fillText(b.note, PAD, y + 16);
-    y += noteH;
-  }
-
-  // Footer
-  ctx.font = `11px ${FFAM}`; ctx.fillStyle = C.muted;
-  ctx.textAlign = "right";
-  ctx.fillText("Beyblade X 收藏管理", PAD + INNER, y + 16);
-  ctx.textAlign = "left";
-
-  // Export
-  canvas.toBlob(async blob => {
-    if (navigator.share && navigator.canShare) {
-      try {
-        const file = new File([blob], "build.png", { type: "image/png" });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: b.name || "Beyblade X 配置" });
-          return;
-        }
-      } catch (e) { if (e.name === "AbortError") return; }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${b.name || "build"}.png`;
-    a.click(); URL.revokeObjectURL(url);
-  }, "image/png");
 }
 
 function toggleBuildCx(id, on) {
@@ -2477,10 +2411,15 @@ function renderPartDetail(type, code) {
   const attr = info.attr || [];
   const stat = info.stat || [];
   const primary = preferredChi(names.chi) || code;
+  const lq = loosePartQty(type, code);
+  const pq = productPartQty(type, code);
+  const tq = pq + lq;
+  const totalOwned = tq > 0;
+  const ec = escapeAttr(code);
   return `<div>
     <h2>
       ${primary}
-      <span class="pill ${owned ? "owned" : "missing"}">${owned ? "已擁有" : "缺少"}</span>
+      <span class="pill ${totalOwned ? "owned" : "missing"}">${totalOwned ? "已擁有" : "缺少"}</span>
     </h2>
     <div class="sub" style="font-family:monospace;">${code}</div>
     <div class="sub">${type === "blade" ? "戰刃 Blade" : type === "ratchet" ? "固鎖 Ratchet" : "軸 Bit"}</div>
@@ -2541,10 +2480,29 @@ function renderPartDetail(type, code) {
       </div>`;
     })()}
 
-    <div class="card">
-      <h3>來自哪些商品（${sources.filter(v => isOwned(v.id)).length}/${sources.length} 已擁有）</h3>
-      <div class="source-list">
-        ${sources.map(v => `<span class="src ${isOwned(v.id) ? "owned" : ""}" onclick="select('product','${v.productId}')">${v.productId} · ${variantDisplayChi(v)}</span>`).join("")}
+    <div class="card" id="part-qty-card">
+      <h3>擁有數量</h3>
+      <div style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
+        ${sources.map(v => {
+          const q = ownedQty(v.id);
+          return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:${q > 0 ? "rgba(46,204,113,0.08)" : "var(--panel2)"}; cursor:pointer;" onclick="select('product','${v.productId}')">
+            <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"};">${q > 0 ? "●" : "○"}</span>
+            <span style="flex:1; ${q > 0 ? "color:var(--text)" : "color:var(--muted)"}">${v.productId}</span>
+            <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"}; font-weight:600;">${q > 0 ? `×${q}` : "—"}</span>
+            <span style="color:var(--muted); font-size:11px;">›</span>
+          </div>`;
+        }).join("")}
+        <div id="loose-part-ctrl" style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:${lq > 0 ? "rgba(78,161,255,0.08)" : "var(--panel2)"};">
+          <span style="color:${lq > 0 ? "var(--accent)" : "var(--muted)"};">${lq > 0 ? "●" : "○"}</span>
+          <span style="flex:1; color:var(--text);">散裝</span>
+          <button class="part-btn" onclick="setLoosePart('${type}','${ec}', -1)" ${lq === 0 ? "disabled" : ""}>−</button>
+          <span style="min-width:20px; text-align:center; font-weight:600; color:${lq > 0 ? "var(--accent)" : "var(--muted)"};">${lq}</span>
+          <button class="part-btn" onclick="setLoosePart('${type}','${ec}', 1)">＋</button>
+        </div>
+        <div data-total style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-top:1px solid var(--border); margin-top:2px;">
+          <span style="flex:1; font-weight:600;">合計</span>
+          <span style="font-weight:700; font-size:15px; color:${tq > 0 ? "var(--owned)" : "var(--muted)"};">${tq}</span>
+        </div>
       </div>
     </div>
   </div>`;
