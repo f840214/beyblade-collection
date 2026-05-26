@@ -553,7 +553,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.101</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.102</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -3286,6 +3286,7 @@ function _applyRemote(remote) {
     state.builds = Array.isArray(remote && remote.builds) ? remote.builds : [];
     state.updatedAt = (remote && remote.updatedAt) || Date.now();
     saveState();
+    if (Array.isArray(remote && remote.trajectories)) _trajSetSlots(remote.trajectories);
   } finally {
     _applyingRemote = false;
   }
@@ -3295,16 +3296,18 @@ function _applyRemote(remote) {
 function _promptConflict(remote) {
   const lOwned = Object.keys(state.owned).length;
   const lBuilds = (state.builds || []).length;
+  const lTraj = _trajGetSlots().length;
   const rOwned = Object.keys(remote.owned || {}).length;
   const rBuilds = (remote.builds || []).length;
+  const rTraj = (remote.trajectories || []).length;
   const lTime = state.updatedAt ? new Date(state.updatedAt).toLocaleString() : "(未知)";
   const rTime = remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)";
   showModal("同步衝突", `
     <p style="margin-top:0;">本機與雲端各有不同的資料，請選擇一邊：</p>
     <div class="sync-row"><span>本機更新時間</span><span>${lTime}</span></div>
-    <div class="sync-row"><span>本機資料</span><span>${lOwned} 個變體 / ${lBuilds} 個配置</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${lOwned} 個變體 / ${lBuilds} 個配置 / ${lTraj} 個軌跡</span></div>
     <div class="sync-row"><span>雲端更新時間</span><span>${rTime}</span></div>
-    <div class="sync-row"><span>雲端資料</span><span>${rOwned} 個變體 / ${rBuilds} 個配置</span></div>
+    <div class="sync-row"><span>雲端資料</span><span>${rOwned} 個變體 / ${rBuilds} 個配置 / ${rTraj} 個軌跡</span></div>
     <p style="color: var(--muted); font-size:12px; margin-top:10px;">「合併」會把兩邊的 owned 取較大數量，builds 用 id 去重後保留兩邊。</p>
   `, [
     { label: "用雲端覆蓋本機", action: () => { _applyRemote(remote); closeModal(); _syncSetStatus("synced", "已從雲端拉取"); Sync.lastSyncAt = Date.now(); } },
@@ -3328,6 +3331,13 @@ function _mergeRemote(remote) {
     state.builds = [...buildsById.values()];
     state.updatedAt = Date.now();
     saveState();
+    // 合併軌跡：用名稱去重，本機優先
+    const localSlots = _trajGetSlots();
+    const remoteSlots = Array.isArray(remote && remote.trajectories) ? remote.trajectories : [];
+    const byName = new Map();
+    remoteSlots.forEach(s => s && s.name && byName.set(s.name, s));
+    localSlots.forEach(s => s && s.name && byName.set(s.name, s));
+    _trajSetSlots([...byName.values()]);
   } finally {
     _applyingRemote = false;
   }
@@ -3341,7 +3351,7 @@ async function syncPushNow(silent = false) {
   try {
     if (!silent) _syncSetStatus("syncing", "上傳中…");
     else _syncSetStatus("syncing", "上傳中…");
-    const body = { schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [], updatedAt: state.updatedAt || Date.now() };
+    const body = { schema: "beyx_collection", version: 1, owned: state.owned, builds: state.builds || [], trajectories: _trajGetSlots(), updatedAt: state.updatedAt || Date.now() };
     const meta = await _uploadSyncFile(Sync.fileId, body);
     Sync.fileId = meta.id;
     Sync.remoteUpdatedAt = body.updatedAt;
