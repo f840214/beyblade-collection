@@ -553,7 +553,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.104</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.105</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -3305,9 +3305,9 @@ function _promptConflict(remote) {
   showModal("同步衝突", `
     <p style="margin-top:0;">本機與雲端各有不同的資料，請選擇一邊：</p>
     <div class="sync-row"><span>本機更新時間</span><span>${lTime}</span></div>
-    <div class="sync-row"><span>本機資料</span><span>${lOwned} 個變體 / ${lBuilds} 個配置 / ${lTraj} 個軌跡</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${lOwned} 個變體 / ${lBuilds} 個配置 / ${lTraj} 個軌跡圖</span></div>
     <div class="sync-row"><span>雲端更新時間</span><span>${rTime}</span></div>
-    <div class="sync-row"><span>雲端資料</span><span>${rOwned} 個變體 / ${rBuilds} 個配置 / ${rTraj} 個軌跡</span></div>
+    <div class="sync-row"><span>雲端資料</span><span>${rOwned} 個變體 / ${rBuilds} 個配置 / ${rTraj} 個軌跡圖</span></div>
     <p style="color: var(--muted); font-size:12px; margin-top:10px;">「合併」會把兩邊的 owned 取較大數量，builds 用 id 去重後保留兩邊。</p>
   `, [
     { label: "用雲端覆蓋本機", action: () => { _applyRemote(remote); closeModal(); _syncSetStatus("synced", "已從雲端拉取"); Sync.lastSyncAt = Date.now(); } },
@@ -3415,7 +3415,7 @@ async function syncPullNow() {
     if (!file) { _syncSetStatus("synced", "雲端沒有資料"); return; }
     Sync.fileId = file.id;
     const remote = await _downloadSyncFile(file.id);
-    if (!confirm(`雲端：${Object.keys(remote.owned || {}).length} 個變體 / ${(remote.builds || []).length} 個配置 / ${(remote.trajectories || []).length} 個軌跡\n更新時間：${remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)"}\n\n用雲端資料覆蓋本機？`)) {
+    if (!confirm(`雲端：${Object.keys(remote.owned || {}).length} 個變體 / ${(remote.builds || []).length} 個配置 / ${(remote.trajectories || []).length} 個軌跡圖\n更新時間：${remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)"}\n\n用雲端資料覆蓋本機？`)) {
       _syncSetStatus("signed-in");
       return;
     }
@@ -3450,7 +3450,7 @@ function _renderSyncDialog() {
       資料只屬於你的 Google 帳號，網站作者看不到也存不到。
     </p>
     <div class="sync-row"><span>狀態</span><span>${statusBadge}${Sync.message ? ' · <span style="color:var(--muted);">' + Sync.message + "</span>" : ""}</span></div>
-    <div class="sync-row"><span>本機資料</span><span>${ownedCount} 個變體 / ${buildCount} 個配置 / ${trajCount} 個軌跡</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${ownedCount} 個變體 / ${buildCount} 個配置 / ${trajCount} 個軌跡圖</span></div>
     <div class="sync-row"><span>本機最後修改</span><span>${localTxt}</span></div>
     <div class="sync-row"><span>最近同步</span><span>${lastSyncTxt}</span></div>
     ${!GOOGLE_CLIENT_ID ? '<p style="color:var(--warn); font-size:12px; margin:8px 0 0;">⚠️ 尚未設定 Client ID。請在 template.html 找到 <code>GOOGLE_CLIENT_ID</code> 填入。</p>' : ""}
