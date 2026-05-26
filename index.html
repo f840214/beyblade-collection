@@ -553,7 +553,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.94</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.100</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -3493,9 +3493,7 @@ function _trajDrawBg(ctx, w, h) {
   }
 }
 
-function _trajRedraw() {
-  _trajDrawBg(_traj.ctx, _traj.w, _traj.h);
-  const { ctx, strokes } = _traj;
+function _trajDrawStrokes(ctx, strokes) {
   for (const s of strokes) {
     if (s.pts.length < 2) continue;
     ctx.strokeStyle = s.color; ctx.lineWidth = s.width;
@@ -3503,22 +3501,24 @@ function _trajRedraw() {
     ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y);
     for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
     ctx.stroke();
-    // Start marker (circle)
     const r = Math.max(s.width * 1.2, 6);
     const start = s.pts[0], end = s.pts[s.pts.length - 1];
     ctx.fillStyle = s.color;
     ctx.beginPath(); ctx.arc(start.x, start.y, r, 0, Math.PI * 2); ctx.fill();
-    // End marker (arrow)
     const last2 = s.pts.length >= 3 ? s.pts[s.pts.length - 3] : start;
     const angle = Math.atan2(end.y - last2.y, end.x - last2.x);
     const aLen = r * 3, aW = r * 2;
-    ctx.fillStyle = s.color;
     ctx.beginPath();
     ctx.moveTo(end.x + Math.cos(angle) * aLen, end.y + Math.sin(angle) * aLen);
     ctx.lineTo(end.x + Math.cos(angle + Math.PI * 0.7) * aW, end.y + Math.sin(angle + Math.PI * 0.7) * aW);
     ctx.lineTo(end.x + Math.cos(angle - Math.PI * 0.7) * aW, end.y + Math.sin(angle - Math.PI * 0.7) * aW);
     ctx.closePath(); ctx.fill();
   }
+}
+
+function _trajRedraw() {
+  _trajDrawBg(_traj.ctx, _traj.w, _traj.h);
+  _trajDrawStrokes(_traj.ctx, _traj.strokes);
 }
 
 function _trajPos(e) {
@@ -3562,17 +3562,20 @@ function trajExport() {
   off.width = w; off.height = h;
   const c = off.getContext("2d");
   _trajDrawBg(c, w, h);
-  for (const s of strokes) {
-    if (s.pts.length < 2) continue;
-    c.strokeStyle = s.color; c.lineWidth = s.width; c.lineCap = "round"; c.lineJoin = "round";
-    c.beginPath(); c.moveTo(s.pts[0].x, s.pts[0].y);
-    for (let i = 1; i < s.pts.length; i++) c.lineTo(s.pts[i].x, s.pts[i].y);
-    c.stroke();
-  }
-  const link = document.createElement("a");
-  link.download = "beyblade-軌跡圖.png";
-  link.href = off.toDataURL("image/png");
-  link.click();
+  _trajDrawStrokes(c, strokes);
+  const fname = "beyblade-軌跡圖.png";
+  off.toBlob(blob => {
+    if (!blob) return;
+    const file = new File([blob], fname, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(() => {});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = fname; link.href = url; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }, "image/png");
 }
 
 function openTrajectory() {
