@@ -3475,7 +3475,7 @@ async function syncBootstrap() {
 // ============================================================
 // 軌跡繪圖 (全螢幕 overlay)
 // ============================================================
-const _traj = { strokes: [], current: null, drawing: false, ctx: null, canvas: null, w: 0, h: 0, bgImg: null };
+const _traj = { strokes: [], current: null, drawing: false, ctx: null, canvas: null, w: 0, h: 0, bgImg: null, activeSlot: null };
 const _STADIUM_SRC = "data:image/png;base64,__STADIUM_B64__";
 
 function _trajLoadBg() {
@@ -3483,6 +3483,88 @@ function _trajLoadBg() {
   _traj.bgImg = new Image();
   _traj.bgImg.onload = () => _trajRedraw();
   _traj.bgImg.src = _STADIUM_SRC;
+}
+
+const TRAJ_STORE_KEY = "beyx_traj_slots";
+// slots: [{name, strokes}], currentIdx
+
+function _trajGetSlots() {
+  try { return JSON.parse(localStorage.getItem(TRAJ_STORE_KEY)) || []; } catch(e) { return []; }
+}
+function _trajSetSlots(slots) {
+  try { localStorage.setItem(TRAJ_STORE_KEY, JSON.stringify(slots)); } catch(e) {}
+}
+function _trajSave() {
+  // auto-save current strokes into active slot
+  if (_traj.activeSlot == null) return;
+  const slots = _trajGetSlots();
+  if (slots[_traj.activeSlot]) {
+    slots[_traj.activeSlot].strokes = _traj.strokes;
+    _trajSetSlots(slots);
+  }
+}
+function _trajLoad() {
+  // migrate old single-key format
+  try {
+    const old = localStorage.getItem("beyx_trajectory");
+    if (old) {
+      const strokes = JSON.parse(old);
+      if (strokes.length) {
+        const slots = _trajGetSlots();
+        slots.push({ name: "未命名", strokes });
+        _trajSetSlots(slots);
+      }
+      localStorage.removeItem("beyx_trajectory");
+    }
+  } catch(e) {}
+}
+
+function trajSaveNew() {
+  if (!_traj.strokes.length) return;
+  const name = prompt("軌跡名稱：", "軌跡 " + (_trajGetSlots().length + 1));
+  if (!name) return;
+  const slots = _trajGetSlots();
+  slots.push({ name, strokes: JSON.parse(JSON.stringify(_traj.strokes)) });
+  _trajSetSlots(slots);
+  _traj.activeSlot = slots.length - 1;
+  _trajRenderSlots();
+}
+
+function trajLoadSlot(idx) {
+  const slots = _trajGetSlots();
+  if (!slots[idx]) return;
+  _traj.strokes = JSON.parse(JSON.stringify(slots[idx].strokes));
+  _traj.activeSlot = idx;
+  _trajRedraw();
+  _trajRenderSlots();
+}
+
+function trajDeleteSlot(idx) {
+  const slots = _trajGetSlots();
+  if (!slots[idx]) return;
+  if (!confirm("刪除「" + slots[idx].name + "」？")) return;
+  slots.splice(idx, 1);
+  _trajSetSlots(slots);
+  if (_traj.activeSlot === idx) { _traj.activeSlot = null; _traj.strokes = []; _trajRedraw(); }
+  else if (_traj.activeSlot > idx) _traj.activeSlot--;
+  _trajRenderSlots();
+}
+
+function trajNewCanvas() {
+  _traj.strokes = [];
+  _traj.activeSlot = null;
+  _trajRedraw();
+  _trajRenderSlots();
+}
+
+function _trajRenderSlots() {
+  const el = document.getElementById("traj-slots");
+  if (!el) return;
+  const slots = _trajGetSlots();
+  if (!slots.length) { el.innerHTML = '<span style="color:var(--muted); font-size:12px;">尚無儲存的軌跡</span>'; return; }
+  el.innerHTML = slots.map((s, i) =>
+    `<span style="display:inline-flex; align-items:center; gap:4px; padding:8px 14px; border-radius:16px; font-size:14px; cursor:pointer; background:${i === _traj.activeSlot ? 'var(--accent)' : 'var(--panel2)'}; color:${i === _traj.activeSlot ? '#fff' : 'var(--text)'};" onclick="trajLoadSlot(${i})">${s.name}<span onclick="event.stopPropagation(); trajDeleteSlot(${i})" style="margin-left:6px; font-size:18px; line-height:1; opacity:0.6; cursor:pointer;">&times;</span></span>`
+  ).join(" ");
 }
 
 function _trajDrawBg(ctx, w, h) {
@@ -3550,10 +3632,10 @@ function _trajEnd() {
   _traj.drawing = false;
   if (_traj.current && _traj.current.pts.length >= 2) _traj.strokes.push(_traj.current);
   _traj.current = null;
-  _trajRedraw();
+  _trajRedraw(); _trajSave();
 }
-function trajUndo() { _traj.strokes.pop(); _trajRedraw(); }
-function trajClear() { _traj.strokes = []; _trajRedraw(); }
+function trajUndo() { _traj.strokes.pop(); _trajRedraw(); _trajSave(); }
+function trajClear() { _traj.strokes = []; _trajRedraw(); _trajSave(); }
 
 function trajExport() {
   if (!_traj.canvas) return;
@@ -3579,22 +3661,29 @@ function trajExport() {
 }
 
 function openTrajectory() {
-  _trajLoadBg();
+  _trajLoad(); _trajLoadBg();
   let overlay = document.getElementById("traj-overlay");
-  if (overlay) { overlay.style.display = "flex"; _trajRedraw(); return; }
+  if (overlay) { overlay.style.display = "flex"; _trajRedraw(); _trajRenderSlots(); return; }
   overlay = document.createElement("div");
   overlay.id = "traj-overlay";
   overlay.style.cssText = "position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; background:#fff;";
   overlay.innerHTML = `
-    <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap; background:var(--panel); border-bottom:1px solid var(--border);">
-      <button onclick="closeTrajectory()" style="font-size:13px;">← 返回</button>
-      <label style="font-size:13px; color:var(--muted);">顏色</label>
-      <input type="color" id="traj-color" value="#1a3a8a" style="width:32px; height:28px; border:none; background:none; cursor:pointer;">
-      <label style="font-size:13px; color:var(--muted);">粗細</label>
-      <input type="range" id="traj-width" min="2" max="16" value="8" style="width:80px;">
-      <button onclick="trajUndo()" style="font-size:13px;">↩ 復原</button>
-      <button onclick="trajClear()" style="font-size:13px;">清空</button>
-      <button onclick="trajExport()" style="font-size:13px;">匯出圖片</button>
+    <div style="display:flex; flex-direction:column; gap:6px; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button onclick="closeTrajectory()" style="font-size:13px;">← 返回</button>
+        <label style="font-size:13px; color:var(--muted);">顏色</label>
+        <input type="color" id="traj-color" value="#1a3a8a" style="width:32px; height:28px; border:none; background:none; cursor:pointer;">
+        <label style="font-size:13px; color:var(--muted);">粗細</label>
+        <input type="range" id="traj-width" min="2" max="16" value="8" style="width:80px;">
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button onclick="trajUndo()" style="font-size:13px;">↩ 復原</button>
+        <button onclick="trajClear()" style="font-size:13px; color:#ff6b6b;">清空</button>
+        <button onclick="trajSaveNew()" style="font-size:13px; background:#2ecc71; color:#fff; border-color:#2ecc71;">儲存</button>
+        <button onclick="trajNewCanvas()" style="font-size:13px; background:var(--accent); color:#fff; border-color:var(--accent);">新畫布</button>
+        <button onclick="trajExport()" style="font-size:13px;">匯出圖片</button>
+      </div>
+      <div id="traj-slots" style="display:flex; flex-wrap:wrap; gap:6px; min-height:20px;"></div>
     </div>
     <div id="traj-container" style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; background:#fff; touch-action:none; overflow:hidden;">
       <canvas id="traj-canvas"></canvas>
@@ -3624,6 +3713,7 @@ function openTrajectory() {
   canvas.addEventListener("touchmove", _trajMove, { passive: false });
   canvas.addEventListener("touchend", _trajEnd);
   canvas.addEventListener("touchcancel", _trajEnd);
+  _trajRenderSlots();
 }
 
 function closeTrajectory() {
