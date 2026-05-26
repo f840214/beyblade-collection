@@ -3512,7 +3512,14 @@ function _trajSave() {
   if (slots[_traj.activeSlot]) {
     slots[_traj.activeSlot].strokes = _traj.strokes;
     _trajSetSlots(slots);
+    _trajTriggerSync();
   }
+}
+function _trajTriggerSync() {
+  // 更新 updatedAt 並觸發 sync push
+  state.updatedAt = Date.now();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (typeof scheduleSyncPush === "function") scheduleSyncPush();
 }
 function _trajLoad() {
   // migrate old single-key format
@@ -3539,6 +3546,7 @@ function trajSaveNew() {
   _trajSetSlots(slots);
   _traj.activeSlot = slots.length - 1;
   _trajRenderSlots();
+  _trajTriggerSync();
 }
 
 function trajLoadSlot(idx) {
@@ -3559,6 +3567,7 @@ function trajDeleteSlot(idx) {
   if (_traj.activeSlot === idx) { _traj.activeSlot = null; _traj.strokes = []; _trajRedraw(); }
   else if (_traj.activeSlot > idx) _traj.activeSlot--;
   _trajRenderSlots();
+  _trajTriggerSync();
 }
 
 function trajNewCanvas() {

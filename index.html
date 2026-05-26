@@ -553,7 +553,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.103</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-05-26">v0.104</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -3512,7 +3512,14 @@ function _trajSave() {
   if (slots[_traj.activeSlot]) {
     slots[_traj.activeSlot].strokes = _traj.strokes;
     _trajSetSlots(slots);
+    _trajTriggerSync();
   }
+}
+function _trajTriggerSync() {
+  // 更新 updatedAt 並觸發 sync push
+  state.updatedAt = Date.now();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (typeof scheduleSyncPush === "function") scheduleSyncPush();
 }
 function _trajLoad() {
   // migrate old single-key format
@@ -3539,6 +3546,7 @@ function trajSaveNew() {
   _trajSetSlots(slots);
   _traj.activeSlot = slots.length - 1;
   _trajRenderSlots();
+  _trajTriggerSync();
 }
 
 function trajLoadSlot(idx) {
@@ -3559,6 +3567,7 @@ function trajDeleteSlot(idx) {
   if (_traj.activeSlot === idx) { _traj.activeSlot = null; _traj.strokes = []; _trajRedraw(); }
   else if (_traj.activeSlot > idx) _traj.activeSlot--;
   _trajRenderSlots();
+  _trajTriggerSync();
 }
 
 function trajNewCanvas() {
