@@ -564,6 +564,8 @@
       <div id="more-menu" class="more-menu" role="menu">
         <button onclick="closeMoreMenu(); toggleTheme()" id="theme-btn">🌙 切換主題</button>
         <hr>
+        <button onclick="closeMoreMenu(); openTrajectory()">📐 軌跡圖</button>
+        <hr>
         <button onclick="closeMoreMenu(); openImport()">📥 匯入</button>
         <button onclick="closeMoreMenu(); openExportShare()">📤 匯出 / 分享</button>
         <hr>
@@ -1194,6 +1196,7 @@ function buildFilters() {
     searchEl.placeholder = "搜尋配置名稱 / 零件…";
     return;
   }
+  searchEl.style.display = "";
   searchEl.placeholder = "搜尋商品代號 / 陀螺 / 零件 / 中文名…";
   if (activeTab === "products") {
     const series = [...new Set(PRODUCT_LIST.map(p => productSeries(p.id)))].sort();
@@ -3467,6 +3470,162 @@ async function syncBootstrap() {
   }
   // 沒有有效快取 → 不彈視窗，標示「點同步重新連線」等使用者主動按
   _syncSetStatus("signed-out", "點同步重新連線");
+}
+
+// ============================================================
+// 軌跡繪圖 (全螢幕 overlay)
+// ============================================================
+const _traj = { strokes: [], current: null, drawing: false, ctx: null, canvas: null, w: 0, h: 0, bgImg: null };
+const _STADIUM_SRC = "data:image/png;base64,__STADIUM_B64__";
+
+function _trajLoadBg() {
+  if (_traj.bgImg) return;
+  _traj.bgImg = new Image();
+  _traj.bgImg.onload = () => _trajRedraw();
+  _traj.bgImg.src = _STADIUM_SRC;
+}
+
+function _trajDrawBg(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+  if (_traj.bgImg && _traj.bgImg.complete && _traj.bgImg.naturalWidth) {
+    ctx.drawImage(_traj.bgImg, 0, 0, w, h);
+  }
+}
+
+function _trajRedraw() {
+  _trajDrawBg(_traj.ctx, _traj.w, _traj.h);
+  const { ctx, strokes } = _traj;
+  for (const s of strokes) {
+    if (s.pts.length < 2) continue;
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y);
+    for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
+    ctx.stroke();
+    // Start marker (circle)
+    const r = Math.max(s.width * 1.2, 6);
+    const start = s.pts[0], end = s.pts[s.pts.length - 1];
+    ctx.fillStyle = s.color;
+    ctx.beginPath(); ctx.arc(start.x, start.y, r, 0, Math.PI * 2); ctx.fill();
+    // End marker (arrow)
+    const last2 = s.pts.length >= 3 ? s.pts[s.pts.length - 3] : start;
+    const angle = Math.atan2(end.y - last2.y, end.x - last2.x);
+    const aLen = r * 3, aW = r * 2;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(end.x + Math.cos(angle) * aLen, end.y + Math.sin(angle) * aLen);
+    ctx.lineTo(end.x + Math.cos(angle + Math.PI * 0.7) * aW, end.y + Math.sin(angle + Math.PI * 0.7) * aW);
+    ctx.lineTo(end.x + Math.cos(angle - Math.PI * 0.7) * aW, end.y + Math.sin(angle - Math.PI * 0.7) * aW);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function _trajPos(e) {
+  const rect = _traj.canvas.getBoundingClientRect();
+  const sx = _traj.w / rect.width, sy = _traj.h / rect.height;
+  const t = e.touches ? e.touches[0] : e;
+  return { x: (t.clientX - rect.left) * sx, y: (t.clientY - rect.top) * sy };
+}
+function _trajStart(e) {
+  e.preventDefault(); _traj.drawing = true;
+  const color = document.getElementById("traj-color").value;
+  const width = parseFloat(document.getElementById("traj-width").value);
+  _traj.current = { color, width, pts: [_trajPos(e)] };
+}
+function _trajMove(e) {
+  if (!_traj.drawing || !_traj.current) return;
+  e.preventDefault();
+  const pt = _trajPos(e); _traj.current.pts.push(pt);
+  const pts = _traj.current.pts, { ctx } = _traj;
+  if (pts.length >= 2) {
+    ctx.strokeStyle = _traj.current.color; ctx.lineWidth = _traj.current.width;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[pts.length-2].x, pts[pts.length-2].y);
+    ctx.lineTo(pt.x, pt.y); ctx.stroke();
+  }
+}
+function _trajEnd() {
+  if (!_traj.drawing) return;
+  _traj.drawing = false;
+  if (_traj.current && _traj.current.pts.length >= 2) _traj.strokes.push(_traj.current);
+  _traj.current = null;
+  _trajRedraw();
+}
+function trajUndo() { _traj.strokes.pop(); _trajRedraw(); }
+function trajClear() { _traj.strokes = []; _trajRedraw(); }
+
+function trajExport() {
+  if (!_traj.canvas) return;
+  const { w, h, strokes } = _traj;
+  const off = document.createElement("canvas");
+  off.width = w; off.height = h;
+  const c = off.getContext("2d");
+  _trajDrawBg(c, w, h);
+  for (const s of strokes) {
+    if (s.pts.length < 2) continue;
+    c.strokeStyle = s.color; c.lineWidth = s.width; c.lineCap = "round"; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(s.pts[0].x, s.pts[0].y);
+    for (let i = 1; i < s.pts.length; i++) c.lineTo(s.pts[i].x, s.pts[i].y);
+    c.stroke();
+  }
+  const link = document.createElement("a");
+  link.download = "beyblade-軌跡圖.png";
+  link.href = off.toDataURL("image/png");
+  link.click();
+}
+
+function openTrajectory() {
+  _trajLoadBg();
+  let overlay = document.getElementById("traj-overlay");
+  if (overlay) { overlay.style.display = "flex"; _trajRedraw(); return; }
+  overlay = document.createElement("div");
+  overlay.id = "traj-overlay";
+  overlay.style.cssText = "position:fixed; inset:0; z-index:200; display:flex; flex-direction:column; background:#fff;";
+  overlay.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap; background:var(--panel); border-bottom:1px solid var(--border);">
+      <button onclick="closeTrajectory()" style="font-size:13px;">← 返回</button>
+      <label style="font-size:13px; color:var(--muted);">顏色</label>
+      <input type="color" id="traj-color" value="#1a3a8a" style="width:32px; height:28px; border:none; background:none; cursor:pointer;">
+      <label style="font-size:13px; color:var(--muted);">粗細</label>
+      <input type="range" id="traj-width" min="2" max="16" value="8" style="width:80px;">
+      <button onclick="trajUndo()" style="font-size:13px;">↩ 復原</button>
+      <button onclick="trajClear()" style="font-size:13px;">清空</button>
+      <button onclick="trajExport()" style="font-size:13px;">匯出圖片</button>
+    </div>
+    <div id="traj-container" style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; background:#fff; touch-action:none; overflow:hidden;">
+      <canvas id="traj-canvas"></canvas>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const canvas = document.getElementById("traj-canvas");
+  const container = document.getElementById("traj-container");
+  const cw = container.clientWidth, ch = container.clientHeight;
+  // Image aspect ratio: 1315:1196 ≈ 1.0994
+  const imgRatio = 1315 / 1196;
+  let dispW, dispH;
+  if (cw / ch > imgRatio) { dispH = Math.min(ch, 800); dispW = Math.round(dispH * imgRatio); }
+  else { dispW = Math.min(cw, 800); dispH = Math.round(dispW / imgRatio); }
+  const dpr = window.devicePixelRatio || 1;
+  const resW = Math.round(dispW * dpr), resH = Math.round(dispH * dpr);
+  _traj.w = resW; _traj.h = resH; _traj.canvas = canvas; _traj.ctx = canvas.getContext("2d");
+  canvas.width = resW; canvas.height = resH;
+  canvas.style.width = dispW + "px"; canvas.style.height = dispH + "px";
+  _trajRedraw();
+
+  canvas.addEventListener("mousedown", _trajStart);
+  canvas.addEventListener("mousemove", _trajMove);
+  canvas.addEventListener("mouseup", _trajEnd);
+  canvas.addEventListener("mouseleave", _trajEnd);
+  canvas.addEventListener("touchstart", _trajStart, { passive: false });
+  canvas.addEventListener("touchmove", _trajMove, { passive: false });
+  canvas.addEventListener("touchend", _trajEnd);
+  canvas.addEventListener("touchcancel", _trajEnd);
+}
+
+function closeTrajectory() {
+  const el = document.getElementById("traj-overlay");
+  if (el) el.style.display = "none";
 }
 
 // ============================================================

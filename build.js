@@ -33,8 +33,10 @@ if (process.env.BEYX_VERSION) {
 const buildDate = new Date().toISOString().slice(0, 10);
 
 const template = fs.readFileSync(path.join(ROOT, "template.html"), "utf8");
+const stadiumB64 = fs.readFileSync(path.join(DATA, "stadium-b64.txt"), "utf8").trim();
 const out = template
   .replace("/*__DATA__*/", "window.DB = " + JSON.stringify(db) + ";")
+  .replace("__STADIUM_B64__", stadiumB64)
   .replaceAll("__VERSION__", version)
   .replaceAll("__BUILD_DATE__", buildDate);
 const dest = path.join(ROOT, "index.html");
