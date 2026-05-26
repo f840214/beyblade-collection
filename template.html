@@ -3415,7 +3415,7 @@ async function syncPullNow() {
     if (!file) { _syncSetStatus("synced", "雲端沒有資料"); return; }
     Sync.fileId = file.id;
     const remote = await _downloadSyncFile(file.id);
-    if (!confirm(`雲端：${Object.keys(remote.owned || {}).length} 個變體 / ${(remote.builds || []).length} 個配置\n更新時間：${remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)"}\n\n用雲端資料覆蓋本機？`)) {
+    if (!confirm(`雲端：${Object.keys(remote.owned || {}).length} 個變體 / ${(remote.builds || []).length} 個配置 / ${(remote.trajectories || []).length} 個軌跡\n更新時間：${remote.updatedAt ? new Date(remote.updatedAt).toLocaleString() : "(未知)"}\n\n用雲端資料覆蓋本機？`)) {
       _syncSetStatus("signed-in");
       return;
     }
@@ -3434,6 +3434,7 @@ function _renderSyncDialog() {
   const localTxt = state.updatedAt ? new Date(state.updatedAt).toLocaleString() : "—";
   const ownedCount = Object.keys(state.owned).length;
   const buildCount = (state.builds || []).length;
+  const trajCount = _trajGetSlots().length;
   const statusBadge = ({
     "signed-out": '<span style="color:var(--muted);">未登入</span>',
     "signed-in": '<span style="color:var(--accent);">已登入</span>',
@@ -3449,7 +3450,7 @@ function _renderSyncDialog() {
       資料只屬於你的 Google 帳號，網站作者看不到也存不到。
     </p>
     <div class="sync-row"><span>狀態</span><span>${statusBadge}${Sync.message ? ' · <span style="color:var(--muted);">' + Sync.message + "</span>" : ""}</span></div>
-    <div class="sync-row"><span>本機資料</span><span>${ownedCount} 個變體 / ${buildCount} 個配置</span></div>
+    <div class="sync-row"><span>本機資料</span><span>${ownedCount} 個變體 / ${buildCount} 個配置 / ${trajCount} 個軌跡</span></div>
     <div class="sync-row"><span>本機最後修改</span><span>${localTxt}</span></div>
     <div class="sync-row"><span>最近同步</span><span>${lastSyncTxt}</span></div>
     ${!GOOGLE_CLIENT_ID ? '<p style="color:var(--warn); font-size:12px; margin:8px 0 0;">⚠️ 尚未設定 Client ID。請在 template.html 找到 <code>GOOGLE_CLIENT_ID</code> 填入。</p>' : ""}
