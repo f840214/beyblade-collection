@@ -1338,13 +1338,15 @@ function buildFilters() {
         <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
         <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
         <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
-        <span class="view-toggle" style="margin-left:auto;">
-          <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()">☰ 列表</button>
-          <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()">▦ 卡片</button>
-        </span>
       </div>
       <div class="filter-row">
         ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
+      </div>
+      <div class="filter-row">
+        <span class="view-toggle">
+          <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()">☰ 列表</button>
+          <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()">▦ 卡片</button>
+        </span>
         <button class="add-custom-btn" onclick="openCustomForm()">＋ 自訂</button>
       </div>
       <div class="filter-row filter-row-colors">
