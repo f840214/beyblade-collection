@@ -145,22 +145,35 @@
   }
   .filters { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
   .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  /* 篩選面板 */
+  .filter-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .filter-panel .fp-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+  }
+  .filter-panel .fp-title { font-weight: 700; font-size: 14px; color: var(--text); }
+  .filter-panel .fp-view { display: inline-flex; align-items: center; gap: 8px; }
+  .filter-panel .fp-view-label { font-size: 12px; color: var(--muted); }
+  .filter-panel .fp-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 14px; }
+  .filter-panel .fp-row + .fp-row { border-top: 1px dashed var(--border); }
+  .filter-panel .fp-label { width: 60px; flex-shrink: 0; font-size: 13px; color: var(--muted); padding-top: 7px; }
+  .filter-panel .fp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1; min-width: 0; }
   .filter-chip {
     display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;
-    padding: 6px 14px; border-radius: 18px; cursor: pointer;
-    border: 1.5px solid var(--border); background: transparent;
+    padding: 6px 14px; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--panel2);
     font-size: 14px; color: var(--muted); transition: all 0.15s;
     user-select: none; -webkit-user-select: none;
   }
-  .filter-chip:not(.active) { opacity: 0.5; }
+  .filter-chip:not(.active) { opacity: 0.85; }
   .filter-chip.active { color: var(--text); border-color: var(--accent); background: rgba(37,99,235,0.12); }
   .filter-chip.active[data-f="owned"] { border-color: var(--owned); background: rgba(22,163,74,0.12); color: var(--owned); }
   .filter-chip.active[data-f="missing"] { border-color: var(--missing); background: rgba(220,38,38,0.12); color: var(--missing); }
   .filter-chip.active[data-f="wishlist"] { border-color: var(--warn); background: rgba(217,119,6,0.12); color: var(--warn); }
   .series-chip {
     display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; white-space: nowrap;
-    padding: 5px 12px; border-radius: 18px; cursor: pointer;
-    border: 1.5px solid var(--border); background: transparent;
+    padding: 6px 14px; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--panel2);
     font-size: 13px; color: var(--muted); transition: all 0.15s;
     user-select: none; -webkit-user-select: none;
   }
@@ -169,7 +182,7 @@
   .series-chip.active[data-s="BX"] { border-color: #71bce9; background: rgba(113,188,233,0.12); }
   .series-chip.active[data-s="CX"] { border-color: #f42597; background: rgba(244,37,151,0.12); }
   .series-chip.active[data-s="UX"] { border-color: #ee7800; background: rgba(238,120,0,0.12); }
-  .series-chip:not(.active) { opacity: 0.4; }
+  .series-chip:not(.active) { opacity: 0.85; }
   .filter-row-colors { flex-wrap: wrap; gap: 10px; }
   .color-sel {
     display: inline-flex; align-items: center; gap: 5px;
@@ -615,7 +628,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-06-05">v0.118</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-06-05">v0.119</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -1335,35 +1348,50 @@ function buildFilters() {
       return s;
     };
     wrap.innerHTML = `
-      <div class="filter-row">
-        <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
-        <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
-        <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
-      </div>
-      <div class="filter-row">
-        ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
-      </div>
-      <div class="filter-row" style="gap:8px;">
-        <span class="view-toggle">
-          <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()">☰ 列表</button>
-          <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()">▦ 卡片</button>
-        </span>
-        <button class="add-custom-btn" onclick="openCustomForm()">＋ 自訂</button>
-      </div>
-      <div class="filter-row filter-row-colors">
-        <label class="color-sel">軸顏色
-          <select onchange="filterOpts.bitColor=this.value||null; render()">
-            <option value="">全部</option>
-            ${usedColorKeys("bit").map(c => `<option value="${c}" ${filterOpts.bitColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
-          </select>
-        </label>
-        <label class="color-sel">固鎖顏色
-          <select onchange="filterOpts.ratColor=this.value||null; render()">
-            <option value="">全部</option>
-            ${usedColorKeys("rat").map(c => `<option value="${c}" ${filterOpts.ratColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
-          </select>
-        </label>
-        ${filterOpts.bitColor || filterOpts.ratColor ? `<button class="color-clear" onclick="filterOpts.bitColor=null; filterOpts.ratColor=null; render()">清除</button>` : ""}
+      <div class="filter-panel">
+        <div class="fp-head">
+          <span class="fp-title">篩選條件</span>
+          <span class="fp-view">
+            <span class="fp-view-label">顯示模式</span>
+            <span class="view-toggle">
+              <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()">☰ 列表</button>
+              <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()">▦ 卡片</button>
+            </span>
+          </span>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">狀態</span>
+          <div class="fp-controls">
+            <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
+            <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
+            <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">分類</span>
+          <div class="fp-controls">
+            ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
+            <button class="add-custom-btn" onclick="openCustomForm()">＋ 自訂</button>
+          </div>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">屬性篩選</span>
+          <div class="fp-controls">
+            <label class="color-sel">軸顏色
+              <select onchange="filterOpts.bitColor=this.value||null; render()">
+                <option value="">全部</option>
+                ${usedColorKeys("bit").map(c => `<option value="${c}" ${filterOpts.bitColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
+              </select>
+            </label>
+            <label class="color-sel">固鎖顏色
+              <select onchange="filterOpts.ratColor=this.value||null; render()">
+                <option value="">全部</option>
+                ${usedColorKeys("rat").map(c => `<option value="${c}" ${filterOpts.ratColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
+              </select>
+            </label>
+            ${filterOpts.bitColor || filterOpts.ratColor ? `<button class="color-clear" onclick="filterOpts.bitColor=null; filterOpts.ratColor=null; render()">清除</button>` : ""}
+          </div>
+        </div>
       </div>
     `;
   } else {
