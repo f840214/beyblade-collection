@@ -170,6 +170,48 @@
   .series-chip.active[data-s="CX"] { border-color: #f42597; background: rgba(244,37,151,0.12); }
   .series-chip.active[data-s="UX"] { border-color: #ee7800; background: rgba(238,120,0,0.12); }
   .series-chip:not(.active) { opacity: 0.4; }
+  .filter-row-colors { flex-wrap: wrap; gap: 10px; }
+  .color-sel {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; color: var(--muted);
+  }
+  .color-sel select {
+    padding: 5px 8px; border-radius: 8px; border: 1.5px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .color-clear {
+    padding: 4px 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 12px;
+  }
+  .add-custom-btn {
+    margin-left: auto; padding: 5px 12px; border-radius: 14px; cursor: pointer;
+    border: 1.5px dashed var(--accent); background: transparent; color: var(--accent);
+    font-size: 13px;
+  }
+  .pc-custom {
+    font-size: 10px; padding: 0 5px; border-radius: 7px; vertical-align: middle;
+    background: rgba(148,163,184,0.25); color: var(--muted); border: 1px solid var(--border);
+  }
+  .btn-edit { color: var(--muted); }
+  /* 自訂表單 */
+  .cf { display: flex; flex-direction: column; gap: 10px; }
+  .cf label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+  .cf input[type=text], .cf select {
+    padding: 8px 10px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; font-size: 14px;
+  }
+  .cf-row { display: flex; gap: 8px; }
+  .cf-row label { flex: 1; min-width: 0; }
+  .cf-clabel { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .cf-colors { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cf-color {
+    display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+    padding: 3px 8px; border-radius: 12px; border: 1.5px solid var(--border);
+    font-size: 12px; color: var(--muted); user-select: none;
+  }
+  .cf-color input { display: none; }
+  .cf-color:has(input:checked) { color: var(--text); border-color: var(--accent); background: rgba(37,99,235,0.12); }
+  .cf-color .cc-dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(128,128,128,0.4); }
 
   .view-toggle {
     display: inline-flex; align-items: center; gap: 0;
@@ -215,6 +257,13 @@
   .product-card .pc-coat-dot {
     width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
     border: 1px solid rgba(255,255,255,0.2);
+  }
+  .product-card .pc-colors { display: flex; gap: 8px; flex-wrap: wrap; }
+  .product-card .pc-pcolor { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); }
+  .product-card .pc-pcolor-l { opacity: 0.8; }
+  .product-card .pc-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(128,128,128,0.4);
   }
   .product-card .pc-img {
     width: 100%; aspect-ratio: 1; object-fit: contain;
@@ -369,6 +418,18 @@
   .variant .v-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .variant .vbey { font-weight: 600; font-size: 15px; line-height: 1.3; }
   .variant .vparts { color: var(--muted); font-size: 12px; }
+  .variant .vcolors { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+  .vcolor-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--panel2); border: 1px solid var(--border);
+  }
+  .vcolor-chip .vcolor-l { color: var(--muted); }
+  .vcolor-chip .vcolor-n { color: var(--text); font-weight: 500; }
+  .vcolor-chip .vcc-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(128,128,128,0.4);
+  }
   .variant .v-actions {
     display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     justify-content: flex-end;
@@ -613,39 +674,61 @@
 const STORAGE_KEY = "beyx_collection_v1";
 
 // 把 prod-beys 整理成更易用的結構
-// 每筆變體有唯一 id: "<productId>#<index>"
-const VARIANTS = [];
-const PRODUCTS = {}; // productId -> { id, type, variants: [variant], hasCoat }
+// 每筆官方變體有唯一 id: "<productId>#<index>"；自訂變體 id: "custom#<n>"
+let VARIANTS = [];
+let PRODUCTS = {}; // productId -> { id, type, variants: [variant], custom? }
+let PRODUCT_LIST = [];
 
-DB.beys.forEach((row, idx) => {
-  // row: [productId, type, "blade ratchet bit", youtube?, options?]
-  const [productId, type, parts, ...rest] = row;
-  let youtube = null, opts = {};
-  rest.forEach(r => {
-    if (typeof r === "string") youtube = r;
-    else if (r && typeof r === "object") opts = r;
-  });
-  const tokens = parts.split(/\s+/);
+// 把 "blade ratchet bit" 字串拆成單一變體物件
+function _makeVariant(productId, type, parts, youtube, opts, id, custom) {
+  const tokens = String(parts).trim().split(/\s+/);
   let blade, ratchet, bit;
   if (tokens.length === 3) {
     [blade, ratchet, bit] = tokens;
   } else {
-    // CX format eg "Bh.Bl.B.K 1-50 I" or 3 tokens always — but "Dr.Ar.S 2-70 K" splits into 3
+    // CX format eg "Bh.Bl.B.K 1-50 I"，最後兩 token 是固鎖/軸，其餘是戰刃
     blade = tokens.slice(0, tokens.length - 2).join(" ");
     ratchet = tokens[tokens.length - 2];
     bit = tokens[tokens.length - 1];
   }
-  const v = {
-    id: productId + "#" + idx,
-    productId, type, blade, ratchet, bit,
-    youtube, opts, raw: parts,
-  };
-  VARIANTS.push(v);
-  if (!PRODUCTS[productId]) PRODUCTS[productId] = { id: productId, type, variants: [] };
-  PRODUCTS[productId].variants.push(v);
-});
+  return { id, productId, type, blade, ratchet, bit, youtube, opts: opts || {}, raw: parts, custom: !!custom };
+}
 
-const PRODUCT_LIST = Object.values(PRODUCTS).sort((a, b) => productSort(a.id).localeCompare(productSort(b.id)));
+// 重建目錄。includeCustom=true 時併入 state.custom（須在 state 載入後呼叫）
+function buildCatalog(includeCustom) {
+  VARIANTS = [];
+  PRODUCTS = {};
+  DB.beys.forEach((row, idx) => {
+    // row: [productId, type, "blade ratchet bit", youtube?, options?]
+    const [productId, type, parts, ...rest] = row;
+    let youtube = null, opts = {};
+    rest.forEach(r => {
+      if (typeof r === "string") youtube = r;
+      else if (r && typeof r === "object") opts = r;
+    });
+    const v = _makeVariant(productId, type, parts, youtube, opts, productId + "#" + idx, false);
+    VARIANTS.push(v);
+    if (!PRODUCTS[productId]) PRODUCTS[productId] = { id: productId, type, variants: [] };
+    PRODUCTS[productId].variants.push(v);
+  });
+  if (includeCustom && typeof state !== "undefined" && Array.isArray(state.custom)) {
+    state.custom.forEach(c => {
+      const opts = {};
+      if (c.coat) opts.coat = c.coat;
+      if (c.bitColor && c.bitColor.length) opts.bitColor = c.bitColor;
+      if (c.ratColor && c.ratColor.length) opts.ratColor = c.ratColor;
+      const parts = [c.blade || "/", c.ratchet || "/", c.bit || "/"].join(" ");
+      const v = _makeVariant(c.productId || "自訂", c.type || "", parts, null, opts, c.id, true);
+      v.customName = c.name || "";
+      VARIANTS.push(v);
+      const pid = v.productId;
+      if (!PRODUCTS[pid]) PRODUCTS[pid] = { id: pid, type: v.type, variants: [], custom: true };
+      PRODUCTS[pid].variants.push(v);
+    });
+  }
+  PRODUCT_LIST = Object.values(PRODUCTS).sort((a, b) => productSort(a.id).localeCompare(productSort(b.id)));
+}
+buildCatalog(false);
 
 function productSort(id) {
   // BX-35 -> "BX-035", BXG-21 -> "BXG-021", CX-7 -> "CX-007"
@@ -776,6 +859,47 @@ const COAT_NAMES = {
 };
 function coatName(c) { return COAT_NAMES[c] || c; }
 
+// 零件顏色（軸/固鎖），來源: phstudy 影像分析（data/part-colors.json），中文+顯示色
+const PART_COLOR_INFO = {
+  blue:{chi:"藍",css:"#2563eb"}, black:{chi:"黑",css:"#222"}, red:{chi:"紅",css:"#dc2626"},
+  yellow:{chi:"黃",css:"#eab308"}, silver:{chi:"銀",css:"#c0c0c0"}, gray:{chi:"灰",css:"#9ca3af"},
+  green:{chi:"綠",css:"#16a34a"}, cyan:{chi:"青",css:"#06b6d4"}, orange:{chi:"橘",css:"#ea580c"},
+  purple:{chi:"紫",css:"#9333ea"}, white:{chi:"白",css:"#f5f5f5"}, pink:{chi:"粉",css:"#ec4899"},
+  brown:{chi:"棕",css:"#92400e"}, "yellow-green":{chi:"黃綠",css:"#84cc16"}, gold:{chi:"金",css:"#d4af37"},
+  bronze:{chi:"古銅",css:"#cd7f32"}, navy:{chi:"深藍",css:"#1e3a8a"},
+};
+// 篩選列顯示順序（依常見度）
+const PART_COLOR_ORDER = ["blue","black","red","yellow","silver","gray","green","cyan","orange","purple","white","pink","brown","yellow-green","gold","bronze","navy"];
+function partColorChi(c) { return (PART_COLOR_INFO[c] || {}).chi || c; }
+function partColorCss(c) { return (PART_COLOR_INFO[c] || {}).css || c; }
+// 一排色點+中文名
+function colorDots(arr) {
+  return (arr || []).map(c => `<span style="color:${partColorCss(c)};">●</span>${partColorChi(c)}`).join(" ");
+}
+// 取某變體某零件的顏色陣列。手動覆蓋(opts/custom)優先(保留全部)，否則查匯入資料 productId|code
+// 匯入的 phstudy 顏色只取主色(陣列第一個)，因為自動分析的副色常是陰影/主題色雜訊
+function variantPartColors(v, kind) {
+  const ov = kind === "bit" ? v.opts && v.opts.bitColor : v.opts && v.opts.ratColor;
+  if (ov) return Array.isArray(ov) ? ov : [ov];
+  const code = kind === "bit" ? v.bit : v.ratchet;
+  if (isEmptyPart(code)) return [];
+  const map = (DB.partColors && DB.partColors[kind === "bit" ? "bit" : "rat"]) || {};
+  const arr = map[v.productId + "|" + code] || [];
+  return arr.length ? [arr[0]] : [];
+}
+// 商品（跨所有變體）某零件出現過的顏色集合。kind: "bit"|"rat"
+function productPartColors(p, kind) {
+  const set = new Set();
+  p.variants.forEach(v => variantPartColors(v, kind).forEach(c => set.add(c)));
+  return set;
+}
+// 目前資料庫某零件實際用到的顏色（依固定順序），給篩選下拉用。kind: "bit"|"rat"
+function usedColorKeys(kind) {
+  const used = new Set();
+  VARIANTS.forEach(v => variantPartColors(v, kind).forEach(c => used.add(c)));
+  return PART_COLOR_ORDER.filter(c => used.has(c));
+}
+
 function productTypeName(code) {
   if (!code) return "";
   const parts = code.split(/\s+/);
@@ -823,6 +947,7 @@ VARIANTS.forEach(v => {
 // 收藏狀態
 // ============================================================
 let state = loadState();
+buildCatalog(true); // 併入使用者自訂陀螺
 
 function loadState() {
   try {
@@ -833,6 +958,7 @@ function loadState() {
       if (!s.prefs || typeof s.prefs !== "object") s.prefs = {};
       if (!s.wishlist || typeof s.wishlist !== "object") s.wishlist = {};
       if (!s.looseParts || typeof s.looseParts !== "object") s.looseParts = {};
+      if (!Array.isArray(s.custom)) s.custom = [];
       // 清除無效的負數散裝資料
       for (const t of ["blade", "ratchet", "bit"]) {
         if (s.looseParts[t]) {
@@ -844,7 +970,7 @@ function loadState() {
       return s;
     }
   } catch (e) {}
-  return { owned: {}, builds: [], updatedAt: 0, prefs: {}, wishlist: {}, looseParts: {} };
+  return { owned: {}, builds: [], updatedAt: 0, prefs: {}, wishlist: {}, looseParts: {}, custom: [] };
 }
 // 是否正在從 Drive 套用遠端資料 (套用過程不應該再回推)
 let _applyingRemote = false;
@@ -1098,6 +1224,8 @@ let filterOpts = {
   missingOnly: false,
   wishlistOnly: false,
   series: {},
+  bitColor: null, // 依「軸」顏色篩選，null = 全部
+  ratColor: null, // 依「固鎖」顏色篩選，null = 全部
 };
 const collapsedGroups = new Set(); // 記住哪些群組是摺疊的，避免 render 時被重置
 let mineView = "detail"; // detail | table
@@ -1210,13 +1338,29 @@ function buildFilters() {
         <span class="filter-chip ${filterOpts.ownedOnly ? "active" : ""}" data-f="owned" onclick="filterOpts.ownedOnly=!filterOpts.ownedOnly; if(filterOpts.ownedOnly){filterOpts.missingOnly=false;filterOpts.wishlistOnly=false;} render()">✓ 擁有</span>
         <span class="filter-chip ${filterOpts.missingOnly ? "active" : ""}" data-f="missing" onclick="filterOpts.missingOnly=!filterOpts.missingOnly; if(filterOpts.missingOnly){filterOpts.ownedOnly=false;filterOpts.wishlistOnly=false;} render()">✗ 缺少</span>
         <span class="filter-chip ${filterOpts.wishlistOnly ? "active" : ""}" data-f="wishlist" onclick="filterOpts.wishlistOnly=!filterOpts.wishlistOnly; if(filterOpts.wishlistOnly){filterOpts.ownedOnly=false;filterOpts.missingOnly=false;} render()">★ 已標記</span>
-      </div>
-      <div class="filter-row">
-        ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
-        <span class="view-toggle">
+        <span class="view-toggle" style="margin-left:auto;">
           <button class="${productView === "list" ? "active" : ""}" onclick="productView='list'; render()">☰ 列表</button>
           <button class="${productView === "grid" ? "active" : ""}" onclick="productView='grid'; render()">▦ 卡片</button>
         </span>
+      </div>
+      <div class="filter-row">
+        ${series.map(s => { const active = filterOpts.series[s] !== false; const hasIcon = ["BX","CX","UX"].includes(s); return `<span class="series-chip ${active ? "active" : ""}" data-s="${s}" onclick="filterOpts.series['${s}']=${active ? "false" : "true"}; render()">${hasIcon ? seriesIcon(s) : s}</span>`; }).join("")}
+        <button class="add-custom-btn" onclick="openCustomForm()">＋ 自訂</button>
+      </div>
+      <div class="filter-row filter-row-colors">
+        <label class="color-sel">軸顏色
+          <select onchange="filterOpts.bitColor=this.value||null; render()">
+            <option value="">全部</option>
+            ${usedColorKeys("bit").map(c => `<option value="${c}" ${filterOpts.bitColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="color-sel">固鎖顏色
+          <select onchange="filterOpts.ratColor=this.value||null; render()">
+            <option value="">全部</option>
+            ${usedColorKeys("rat").map(c => `<option value="${c}" ${filterOpts.ratColor === c ? "selected" : ""}>${partColorChi(c)}</option>`).join("")}
+          </select>
+        </label>
+        ${filterOpts.bitColor || filterOpts.ratColor ? `<button class="color-clear" onclick="filterOpts.bitColor=null; filterOpts.ratColor=null; render()">清除</button>` : ""}
       </div>
     `;
   } else {
@@ -1565,6 +1709,8 @@ function renderProductList(q) {
       if (filterOpts.ownedOnly && ownedV === 0) return "";
       if (filterOpts.missingOnly && ownedV === total) return "";
       if (filterOpts.wishlistOnly && !p.variants.some(v => isWishlisted(v.id))) return "";
+      if (filterOpts.bitColor && !productPartColors(p, "bit").has(filterOpts.bitColor)) return "";
+      if (filterOpts.ratColor && !productPartColors(p, "rat").has(filterOpts.ratColor)) return "";
       visible++;
       const cls = (ownedV === total ? "owned" : "") + (selected && selected.type==="product" && selected.id===p.id ? " selected" : "");
       const blades = [...new Set(p.variants
@@ -1583,7 +1729,7 @@ function renderProductList(q) {
       const hasWish = p.variants.some(v => isWishlisted(v.id));
       return `<div class="item ${cls}" onclick="select('product','${p.id}')">
         <span class="check ${isSingle ? "toggleable" : ""}" ${checkClick ? `onclick="${checkClick}"` : ""} title="${checkTitle}">${checkChar}</span>
-        <span class="name">${hasWish ? "★ " : ""}${p.id}</span>
+        <span class="name">${hasWish ? "★ " : ""}${p.id}${p.custom ? ` <span class="pc-custom">自訂</span>` : ""}</span>
         <span style="color:var(--muted); font-size:11px;" title="${p.type}">${productTypeName(p.type)}</span>
         <span style="font-size:11px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${blades.join("、")}">${bladesStr}</span>
         <span class="qty">${ownedV}/${total}</span>
@@ -1623,6 +1769,8 @@ function renderProductGrid(q) {
       if (filterOpts.ownedOnly && ownedV === 0) return;
       if (filterOpts.missingOnly && ownedV === total) return;
       if (filterOpts.wishlistOnly && !p.variants.some(v => isWishlisted(v.id))) return;
+      if (filterOpts.bitColor && !productPartColors(p, "bit").has(filterOpts.bitColor)) return;
+      if (filterOpts.ratColor && !productPartColors(p, "rat").has(filterOpts.ratColor)) return;
       const pct = total > 0 ? (ownedV / total * 100) : 0;
       const badgeHtml = ownedV === total
         ? `<span class="pc-badge done">完成</span>`
@@ -1633,13 +1781,24 @@ function renderProductGrid(q) {
       const blades = [...new Set(p.variants
         .map(v => isEmptyPart(v.blade) ? null : bladeName(v.blade))
         .filter(Boolean))];
-      const nameStr = blades.length === 0 ? ""
+      const customName = p.custom ? ((p.variants.find(v => v.customName) || {}).customName || "") : "";
+      const nameStr = customName || (blades.length === 0 ? ""
         : blades.length > 2 ? blades.slice(0, 2).join("、") + ` +${blades.length - 2}`
-        : blades.join("、");
+        : blades.join("、"));
       const coats = [...new Set(p.variants.map(v => v.opts?.coat).filter(Boolean))];
       const coatHtml = coats.length ? coats.map(c =>
         `<span class="pc-coat" style="--coat:${c}"><span class="pc-coat-dot" style="background:${c}"></span>${coatName(c)}</span>`
       ).join("") : "";
+      const bitCols = [], ratCols = [];
+      p.variants.forEach(v => {
+        variantPartColors(v, "bit").forEach(c => { if (!bitCols.includes(c)) bitCols.push(c); });
+        variantPartColors(v, "rat").forEach(c => { if (!ratCols.includes(c)) ratCols.push(c); });
+      });
+      const dotRow = (label, arr) => arr.length
+        ? `<span class="pc-pcolor"><span class="pc-pcolor-l">${label}</span>${arr.map(c => `<span class="pc-dot" style="background:${partColorCss(c)}" title="${partColorChi(c)}"></span>`).join("")}</span>`
+        : "";
+      const pcolorHtml = (bitCols.length || ratCols.length)
+        ? `<div class="pc-colors">${dotRow("軸", bitCols)}${dotRow("固鎖", ratCols)}</div>` : "";
       const attrSet = new Set();
       p.variants.forEach(v => {
         if (!isEmptyPart(v.blade)) {
@@ -1652,11 +1811,13 @@ function renderProductGrid(q) {
       cards.push(`<div class="product-card ${cls}" onclick="select('product','${p.id}')">
         <div class="pc-header">
           <span class="pc-code">${p.id}</span>
+          ${p.custom ? `<span class="pc-custom">自訂</span>` : ""}
           ${badgeHtml}
         </div>
         <span class="pc-type">${productTypeName(p.type)} · ${total} 款</span>
         ${nameStr ? `<span class="pc-name">${nameStr}</span>` : ""}
         ${attrHtml || coatHtml ? `<div class="pc-tags">${attrHtml}${coatHtml}</div>` : ""}
+        ${pcolorHtml}
         <img class="pc-img" src="${productImageSrc(p.id)}" alt="${p.id}" loading="lazy" onerror="this.outerHTML='<div class=\\'pc-noimg\\'>暫無圖片</div>'">
         <div class="pc-foot">
           <span>${ownedV}/${total}</span>
@@ -2360,7 +2521,15 @@ function renderProductDetail(p) {
     const cnDisplay = `${bChi} · ${ratchetDisplay} · ${bitChi}`;
     const meta = [];
     if (v.opts.get)  meta.push(`每箱 ${v.opts.get} 盒`);
-    if (v.opts.coat) meta.push(`<span style="color:${v.opts.coat};">●</span> ${coatName(v.opts.coat)}版`);
+    const ratCs = variantPartColors(v, "rat");
+    const bitCs = variantPartColors(v, "bit");
+    const chips = [];
+    if (v.opts.coat) chips.push(`<span class="vcolor-chip"><span class="vcolor-l">色版</span><span class="vcc-dot" style="background:${v.opts.coat}"></span><span class="vcolor-n">${coatName(v.opts.coat)}</span></span>`);
+    const partChip = (label, cs) => cs.length
+      ? `<span class="vcolor-chip"><span class="vcolor-l">${label}</span>${cs.map(c => `<span class="vcc-dot" style="background:${partColorCss(c)}"></span>`).join("")}<span class="vcolor-n">${cs.map(partColorChi).join("/")}</span></span>`
+      : "";
+    if (ratCs.length) chips.push(partChip("固鎖", ratCs));
+    if (bitCs.length) chips.push(partChip("軸", bitCs));
     const attrLabels = [];
     if (blade?.attr) {
       const ATTR_L = { att: "攻擊", def: "防禦", sta: "持久", bal: "平衡" };
@@ -2376,11 +2545,13 @@ function renderProductDetail(p) {
           <div class="vbey">${cnDisplay}</div>
           ${attrLabels.length ? `<div style="margin:2px 0;">${attrLabels.join("")}</div>` : ""}
           <div class="vparts" style="font-family:monospace;">${codeStr}</div>
+          ${chips.length ? `<div class="vcolors">${chips.join("")}</div>` : ""}
           ${meta.length ? `<div class="vparts">${meta.join(" · ")}</div>` : ""}
         </div>
         <span class="badge">${owned ? "✓ 擁有" : "—"}</span>
       </div>
       <div class="v-actions">
+        ${v.custom ? `<button class="btn-edit" onclick="event.stopPropagation(); openCustomForm('${v.id}')" title="編輯自訂">✎</button>` : ""}
         <button class="btn-wish" onclick="event.stopPropagation(); toggleWishlist('${v.id}')" title="${wished ? "取消想要" : "加入想要"}" style="color:${wished ? "var(--warn)" : "var(--muted)"};">${wished ? "★" : "☆"}</button>
         <button onclick="setOwned('${v.id}', ${qty - 1})" ${qty <= 0 ? "disabled" : ""}>−</button>
         <input type="number" class="vqty" min="0" value="${qty}" onchange="setOwned('${v.id}', this.value)">
@@ -2389,7 +2560,7 @@ function renderProductDetail(p) {
     </div>`;
   }).join("");
   return `<div>
-    <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span></h2>
+    <h2>${p.id} <span style="color:var(--muted); font-size: 13px;" title="${p.type}">${productTypeName(p.type)}</span>${p.custom ? ` <span class="pc-custom">自訂</span>` : ""}</h2>
     <div class="sub">擁有 ${ownedV}/${p.variants.length} 陀螺${(() => { const pr = productPrice(p.id); return pr ? ` · ${pr}` : ""; })()}</div>
     <div class="prod-img-wrap">
       <img class="prod-img" src="${productImageSrc(p.id)}" alt="${p.id}"
@@ -2495,9 +2666,15 @@ function renderPartDetail(type, code) {
       <div style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
         ${sources.map(v => {
           const q = ownedQty(v.id);
+          const pcKind = type === "bit" ? "bit" : type === "ratchet" ? "rat" : null;
+          const cs = pcKind ? variantPartColors(v, pcKind) : [];
+          const colorTag = cs.length
+            ? `<span style="display:inline-flex; align-items:center; gap:3px; font-size:11px; color:var(--muted);">${cs.map(c => `<span style="width:10px; height:10px; border-radius:50%; background:${partColorCss(c)}; border:1px solid rgba(128,128,128,0.4); display:inline-block;"></span>`).join("")}${cs.map(partColorChi).join("/")}</span>`
+            : "";
           return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:${q > 0 ? "rgba(46,204,113,0.08)" : "var(--panel2)"}; cursor:pointer;" onclick="showProductModal('${v.productId}')">
             <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"};">${q > 0 ? "●" : "○"}</span>
             <span style="flex:1; ${q > 0 ? "color:var(--text)" : "color:var(--muted)"}">${v.productId}</span>
+            ${colorTag}
             <span style="color:${q > 0 ? "var(--owned)" : "var(--muted)"}; font-weight:600;">${q > 0 ? `×${q}` : "—"}</span>
             <span style="color:var(--muted); font-size:11px;">›</span>
           </div>`;
@@ -3024,6 +3201,76 @@ function showModal(title, bodyHtml, actions) {
   document.getElementById("modal-bg").classList.add("open");
 }
 function closeModal() { document.getElementById("modal-bg").classList.remove("open"); }
+
+// ===== 自訂陀螺（localStorage state.custom）=====
+function _esc(s) { return String(s == null ? "" : s).replace(/"/g, "&quot;"); }
+function _colorChecks(name, selected) {
+  selected = selected || [];
+  return PART_COLOR_ORDER.map(c =>
+    `<label class="cf-color"><input type="checkbox" name="${name}" value="${c}" ${selected.includes(c) ? "checked" : ""}><span class="cc-dot" style="background:${partColorCss(c)}"></span>${partColorChi(c)}</label>`
+  ).join("");
+}
+function openCustomForm(editId) {
+  const c = editId ? (state.custom.find(x => x.id === editId) || {}) : {};
+  const body = `
+    <div class="cf">
+      <label>商品代號<input id="cf-pid" type="text" value="${_esc(c.productId)}" placeholder="例如 BXA-06（選填）"></label>
+      <label>中文名稱<input id="cf-name" type="text" value="${_esc(c.name)}" placeholder="選填，例如 蒼龍爆刃"></label>
+      <div class="cf-row">
+        <label>戰刃<input id="cf-blade" type="text" value="${_esc(c.blade)}" placeholder="代碼/名稱"></label>
+        <label>固鎖<input id="cf-rat" type="text" value="${_esc(c.ratchet)}" placeholder="例如 3-60"></label>
+        <label>軸<input id="cf-bit" type="text" value="${_esc(c.bit)}" placeholder="例如 F"></label>
+      </div>
+      <label>整體色版
+        <select id="cf-coat">
+          <option value="">（無）</option>
+          ${Object.keys(COAT_NAMES).map(k => `<option value="${k}" ${c.coat === k ? "selected" : ""}>${COAT_NAMES[k]}</option>`).join("")}
+        </select>
+      </label>
+      <div class="cf-clabel">軸顏色</div>
+      <div class="cf-colors">${_colorChecks("cf-bitcolor", c.bitColor)}</div>
+      <div class="cf-clabel">固鎖顏色</div>
+      <div class="cf-colors">${_colorChecks("cf-ratcolor", c.ratColor)}</div>
+    </div>`;
+  const actions = [];
+  if (editId) actions.push({ label: "刪除", action: () => deleteCustom(editId) });
+  actions.push({ label: "取消", action: closeModal });
+  actions.push({ label: "儲存", primary: true, action: () => saveCustomForm(editId) });
+  showModal(editId ? "編輯自訂陀螺" : "新增自訂陀螺", body, actions);
+}
+function _readChecks(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(e => e.value);
+}
+function saveCustomForm(editId) {
+  const g = id => document.getElementById(id).value.trim();
+  const obj = {
+    id: editId || ("custom#" + (state.custom.reduce((m, x) => Math.max(m, parseInt((x.id || "").split("#")[1]) || 0), 0) + 1)),
+    productId: g("cf-pid"), name: g("cf-name"), type: "",
+    blade: g("cf-blade"), ratchet: g("cf-rat"), bit: g("cf-bit"),
+    coat: document.getElementById("cf-coat").value,
+    bitColor: _readChecks("cf-bitcolor"), ratColor: _readChecks("cf-ratcolor"),
+  };
+  if (!obj.productId && !obj.name && !obj.blade && !obj.ratchet && !obj.bit) { alert("至少填一個欄位"); return; }
+  if (!obj.productId) obj.productId = obj.name || "自訂";
+  if (editId) { const i = state.custom.findIndex(x => x.id === editId); state.custom[i] = obj; }
+  else state.custom.push(obj);
+  saveState();
+  buildCatalog(true);
+  closeModal();
+  selected = { type: "product", id: obj.productId };
+  render();
+}
+function deleteCustom(id) {
+  if (!confirm("確定刪除這個自訂陀螺？相關的擁有/標記也會一併移除。")) return;
+  state.custom = state.custom.filter(x => x.id !== id);
+  delete state.owned[id];
+  delete state.wishlist[id];
+  saveState();
+  buildCatalog(true);
+  selected = null;
+  closeModal();
+  render();
+}
 
 function showProductModal(pid) {
   const p = PRODUCTS[pid]; if (!p) return;

@@ -17,6 +17,7 @@ const db = {
   ratchet:       load("part-ratchet.json"),
   bit:           load("part-bit.json"),
   tier:          load("tier.json"),
+  partColors:    load("part-colors.json"),
 };
 
 // 版本號: 環境變數 BEYX_VERSION 優先；否則 v0.{commit數+1}; 還沒 commit 過就用 dev
