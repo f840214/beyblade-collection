@@ -628,7 +628,7 @@
 <body>
 <header>
   <div style="display:flex; flex-direction:column; gap:4px;">
-    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-06-05">v0.119</span></h1>
+    <h1>Beyblade X 收藏管理 <span style="color:var(--muted); font-size:11px; font-weight:normal; margin-left:4px;" title="建置日期 2026-06-05">v0.120</span></h1>
     <div class="stats" id="stats">載入中…</div>
   </div>
   <div class="actions">
@@ -891,7 +891,7 @@ function colorDots(arr) {
   return (arr || []).map(c => `<span style="color:${partColorCss(c)};">●</span>${partColorChi(c)}`).join(" ");
 }
 // 取某變體某零件的顏色陣列。手動覆蓋(opts/custom)優先(保留全部)，否則查匯入資料 productId|code
-// 匯入的 phstudy 顏色只取主色(陣列第一個)，因為自動分析的副色常是陰影/主題色雜訊
+// 軸(bit)只取主色(陣列第一個)，因為自動分析的副色常是陰影雜訊；固鎖(rat)顯示全部顏色
 function variantPartColors(v, kind) {
   const ov = kind === "bit" ? v.opts && v.opts.bitColor : v.opts && v.opts.ratColor;
   if (ov) return Array.isArray(ov) ? ov : [ov];
@@ -899,7 +899,8 @@ function variantPartColors(v, kind) {
   if (isEmptyPart(code)) return [];
   const map = (DB.partColors && DB.partColors[kind === "bit" ? "bit" : "rat"]) || {};
   const arr = map[v.productId + "|" + code] || [];
-  return arr.length ? [arr[0]] : [];
+  if (kind === "bit") return arr.length ? [arr[0]] : [];
+  return arr;
 }
 // 商品（跨所有變體）某零件出現過的顏色集合。kind: "bit"|"rat"
 function productPartColors(p, kind) {
