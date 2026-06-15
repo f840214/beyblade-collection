@@ -1,6 +1,6 @@
 {
-  "scrapedAt": "2026-06-14T11:21:11.892Z",
-  "total": 130,
+  "scrapedAt": "2026-06-15T14:51:07.190Z",
+  "total": 137,
   "products": [
     {
       "code": "CX-00-EVA",
@@ -12,6 +12,78 @@
       "release": "2026.8.29",
       "price": "¥7,500",
       "img": "_image/BXG57_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "CX-00-DRB",
+      "series": "CX",
+      "type": "booster",
+      "attr": "att",
+      "nameJp": null,
+      "category": "ブースター",
+      "release": "2026.7.9",
+      "price": "¥1,900",
+      "img": "_image/BXH23_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "CX-00-HF",
+      "series": "CX",
+      "type": "booster",
+      "attr": "bal",
+      "nameJp": null,
+      "category": "ブースター",
+      "release": "2026.7.9",
+      "price": "¥1,800",
+      "img": "_image/BXG79_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "CX-00-KW",
+      "series": "CX",
+      "type": "booster",
+      "attr": "sta",
+      "nameJp": null,
+      "category": "ブースター",
+      "release": "2026.7.9",
+      "price": "¥1,800",
+      "img": "_image/BXG80_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "CX-00-BA",
+      "series": "CX",
+      "type": "booster",
+      "attr": "def",
+      "nameJp": null,
+      "category": "ブースター",
+      "release": "2026.7.9",
+      "price": "¥1,800",
+      "img": "_image/BXG81_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "UX-20",
+      "series": "UX",
+      "type": "starter",
+      "attr": "att",
+      "nameJp": "グローリーワルキューレLF",
+      "category": "スターター",
+      "release": "2026.7.11",
+      "price": "¥2,700",
+      "img": "_image/UX20_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "BX-50",
+      "series": "BX",
+      "type": "random_booster",
+      "attr": null,
+      "nameJp": "ランダムブースターVol.11",
+      "category": "ランダムブースター",
+      "release": "2026.7.11",
+      "price": "¥1,600",
+      "img": "_image/BX50_list.png",
       "inCollection": false
     },
     {
@@ -205,6 +277,18 @@
       "price": "¥1,700",
       "img": "_image/CX12_list.png",
       "inCollection": true
+    },
+    {
+      "code": "BX-00-SP",
+      "series": "BX",
+      "type": "starter",
+      "attr": "att",
+      "nameJp": "ストームペガシス3-70RA",
+      "category": "スターター",
+      "release": "2026.07.11",
+      "price": "¥2,620",
+      "img": "_image/BXG47_list.png",
+      "inCollection": false
     },
     {
       "code": "CX-09",
