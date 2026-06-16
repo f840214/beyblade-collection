@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-06-15T14:51:07.190Z",
+  "scrapedAt": "2026-06-16T13:19:55.222Z",
   "total": 137,
   "products": [
     {
@@ -84,7 +84,7 @@
       "release": "2026.7.11",
       "price": "¥1,600",
       "img": "_image/BX50_list.png",
-      "inCollection": false
+      "inCollection": true
     },
     {
       "code": "CX-18",
