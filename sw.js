@@ -1,4 +1,4 @@
-const CACHE_NAME = "beyx-v1";
+const CACHE_NAME = "beyx-v2";
 const STATIC_ASSETS = [
   "./",
   "index.html",
@@ -46,18 +46,20 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Images & other assets: cache first, fallback to network (then cache)
+  // Images & other assets: stale-while-revalidate
+  // 先回快取（快速/離線），同時背景抓新版更新快取 → 同名圖片更新後下次載入即生效
   e.respondWith(
-    caches.match(e.request).then(
-      (cached) =>
-        cached ||
-        fetch(e.request).then((resp) => {
+    caches.match(e.request).then((cached) => {
+      const networked = fetch(e.request)
+        .then((resp) => {
           if (resp.ok) {
             const clone = resp.clone();
             caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
           }
           return resp;
         })
-    )
+        .catch(() => cached);
+      return cached || networked;
+    })
   );
 });
