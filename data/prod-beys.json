@@ -219,5 +219,6 @@
   ["BX-06","B H","KnSh 3-80 N","Zc2tfhrXxBA"],["BX-05","B H","WzAr 4-80 B","Zc2tfhrXxBA"],
   ["BX-04","S","KnSh 3-80 N","ztd9tpZs6dA"],["BX-03","S","WzAr 4-80 B","ztd9tpZs6dA"],
   ["BX-02","S","HlSc 4-60 T","ztd9tpZs6dA"],["BX-01","S","DrSw 3-60 F","ztd9tpZs6dA"],
-  ["CX-18","RB","Br.Wp.O.W 5-70 Nr"],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"gold"}],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"black"}]
+  ["CX-18","RB","Br.Wp.O.W 5-70 Nr"],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"gold"}],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"black"}],
+  ["BX-50","RB","/ / /"]
 ]
