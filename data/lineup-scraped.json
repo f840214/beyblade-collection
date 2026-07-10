@@ -1,7 +1,19 @@
 {
-  "scrapedAt": "2026-07-09T11:41:37.048Z",
-  "total": 137,
+  "scrapedAt": "2026-07-10T11:38:13.550Z",
+  "total": 138,
   "products": [
+    {
+      "code": "CX-00-TIGA",
+      "series": "BX",
+      "type": "starter",
+      "attr": "bal",
+      "nameJp": "ティガレイジFT3-60T",
+      "category": "スターター",
+      "release": "2026.9.12",
+      "price": "¥2,750",
+      "img": "_image/BXG70_list.png",
+      "inCollection": false
+    },
     {
       "code": "CX-00-EVA",
       "series": "CX",
