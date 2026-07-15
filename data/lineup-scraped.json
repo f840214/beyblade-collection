@@ -1,10 +1,10 @@
 {
-  "scrapedAt": "2026-07-14T10:27:23.229Z",
-  "total": 138,
+  "scrapedAt": "2026-07-15T10:30:53.365Z",
+  "total": 141,
   "products": [
     {
       "code": "CX-00-TIGA",
-      "series": "BX",
+      "series": "CX",
       "type": "starter",
       "attr": "bal",
       "nameJp": "ティガレイジFT3-60T",
@@ -12,6 +12,30 @@
       "release": "2026.9.12",
       "price": "¥2,750",
       "img": "_image/BXG70_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "UX-21",
+      "series": "UX",
+      "type": "set",
+      "attr": null,
+      "nameJp": "ヘルズネザーデッキセット",
+      "category": "セット",
+      "release": "2026.8.8",
+      "price": "¥4,500",
+      "img": "_image/UX21_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "BX-57",
+      "series": "BX",
+      "type": "tool",
+      "attr": null,
+      "nameJp": "3on3デッキケース ブラックVer.",
+      "category": "ツール",
+      "release": "2026.8.8",
+      "price": "¥1,100",
+      "img": "_image/BX57_list.png",
       "inCollection": false
     },
     {
@@ -24,6 +48,18 @@
       "release": "2026.8.29",
       "price": "¥7,500",
       "img": "_image/BXG57_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "UX-00-GV",
+      "series": "UX",
+      "type": "starter",
+      "attr": "att",
+      "nameJp": null,
+      "category": "スターター",
+      "release": "2026.8.29",
+      "price": "¥2,800",
+      "img": "_image/BXG63_list.png",
       "inCollection": false
     },
     {
