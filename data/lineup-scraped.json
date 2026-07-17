@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-07-17T08:27:25.926Z",
+  "scrapedAt": "2026-07-17T10:27:25.993Z",
   "total": 141,
   "products": [
     {
@@ -120,7 +120,7 @@
       "release": "2026.7.11",
       "price": "¥2,700",
       "img": "_image/UX20_list.png",
-      "inCollection": false
+      "inCollection": true
     },
     {
       "code": "BX-50",
