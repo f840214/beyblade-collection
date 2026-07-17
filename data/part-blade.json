@@ -10,6 +10,17 @@
         "desc": "金屬連接至中央能提高剛性；重量級的六枚刃作強烈連打攻擊。",
         "attr": ["att","right","expand"]
     },
+   "GlVl": {
+        "group": "UX",
+        "names": {
+            "jap": "グローリーワルキューレ",
+            "eng": "GloryValkyrie",
+            "chi": "榮耀戰神"
+        },
+        "stat": [],
+        "desc": "固鎖一體化的 UX Expand Blade。具備彈跳（bound）機能，能將對手大幅彈飛的攻擊型戰刃。",
+        "attr": ["att","right"]
+    },
    "BlGr": {
         "group": "UX",
         "names": {

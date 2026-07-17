@@ -220,5 +220,6 @@
   ["BX-04","S","KnSh 3-80 N","ztd9tpZs6dA"],["BX-03","S","WzAr 4-80 B","ztd9tpZs6dA"],
   ["BX-02","S","HlSc 4-60 T","ztd9tpZs6dA"],["BX-01","S","DrSw 3-60 F","ztd9tpZs6dA"],
   ["CX-18","RB","Br.Wp.O.W 5-70 Nr"],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"gold"}],["CX-18","RB H","Br.Wp.O.W 5-70 Nr",{"coat":"black"}],
-  ["BX-50","RB","HvRn 0-80 DS"],["BX-50","RB H","HvRn 6-60 TP"],["BX-50","RB H","ImDr 7-55 FB"],["BX-50","RB H","GhCr M-85 DS"],["BX-50","RB H","Wl.Fl.D 9-65 L"],["BX-50","RB H","Cr.Rp.B 0-80 WB"]
+  ["BX-50","RB","HvRn 0-80 DS"],["BX-50","RB H","HvRn 6-60 TP"],["BX-50","RB H","ImDr 7-55 FB"],["BX-50","RB H","GhCr M-85 DS"],["BX-50","RB H","Wl.Fl.D 9-65 L"],["BX-50","RB H","Cr.Rp.B 0-80 WB"],
+  ["UX-20","S","GlVl = LF"]
 ]
