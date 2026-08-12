@@ -1,7 +1,19 @@
 {
-  "scrapedAt": "2026-08-11T09:45:21.240Z",
-  "total": 141,
+  "scrapedAt": "2026-08-12T09:50:48.862Z",
+  "total": 142,
   "products": [
+    {
+      "code": "CX-19",
+      "series": "CX",
+      "type": "random_booster",
+      "attr": "def",
+      "nameJp": "ランダムブースター クロコトレッドセレクト",
+      "category": "ランダムブースター",
+      "release": "2026.9.12",
+      "price": "¥1,600",
+      "img": "_image/CX19_list.png",
+      "inCollection": false
+    },
     {
       "code": "CX-00-TIGA",
       "series": "CX",
@@ -24,7 +36,7 @@
       "release": "2026.8.8",
       "price": "¥4,500",
       "img": "_image/UX21_list.png",
-      "inCollection": false
+      "inCollection": true
     },
     {
       "code": "BX-57",
@@ -536,7 +548,7 @@
       "type": "starter",
       "attr": null,
       "nameJp": null,
-      "category": "ダブルス���ーター",
+      "category": "ダブルスターター",
       "release": "2025.4.26",
       "price": "¥4,180",
       "img": "_image/BXG33_list.png",
