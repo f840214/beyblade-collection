@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-09-03T13:02:25.078Z",
+  "scrapedAt": "2026-09-04T12:57:24.160Z",
   "total": 142,
   "products": [
     {
@@ -1395,6 +1395,18 @@
       "inCollection": false
     },
     {
+      "code": "BX-13",
+      "series": "BX",
+      "type": "booster",
+      "attr": "def",
+      "nameJp": "ナイトランス4-80HN",
+      "category": "ブースター",
+      "release": "2023.8.10",
+      "price": "¥1,400",
+      "img": "_image/BX13_list.png",
+      "inCollection": true
+    },
+    {
       "code": "BX-00-DS",
       "series": "BX",
       "type": "booster",
@@ -1692,18 +1704,6 @@
       "release": "2023.10.7",
       "price": "¥1,980",
       "img": "_image/BX15_list.png",
-      "inCollection": true
-    },
-    {
-      "code": "BX-13",
-      "series": "BX",
-      "type": "booster",
-      "attr": "def",
-      "nameJp": "ナイトランス4-80HN",
-      "category": "ブースター",
-      "release": null,
-      "price": "¥1,400",
-      "img": "_image/BX13_list.png",
       "inCollection": true
     }
   ]
