@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-09-05T12:09:02.039Z",
+  "scrapedAt": "2026-09-06T12:24:09.510Z",
   "total": 142,
   "products": [
     {
@@ -1342,7 +1342,7 @@
       "nameJp": "ダブルエクストリームスタジアムセット",
       "category": "セット",
       "release": "2024.10.12",
-      "price": "¥8,200",
+      "price": null,
       "img": "_image/BX37_list.png",
       "inCollection": true
     },
