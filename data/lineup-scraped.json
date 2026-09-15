@@ -1,6 +1,6 @@
 {
-  "scrapedAt": "2026-09-14T15:17:00.546Z",
-  "total": 142,
+  "scrapedAt": "2026-09-15T13:55:31.377Z",
+  "total": 145,
   "products": [
     {
       "code": "CX-19",
@@ -325,6 +325,42 @@
       "price": "¥1,600",
       "img": "_image/BX48_list.png",
       "inCollection": true
+    },
+    {
+      "code": "BX-56",
+      "series": "BX",
+      "type": "tool",
+      "attr": null,
+      "nameJp": "ストリングランチャーL ホワイト×バイオレット",
+      "category": "ツール",
+      "release": "2026.10.10",
+      "price": "¥1,100",
+      "img": "_image/BX56_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "BX-53",
+      "series": "BX",
+      "type": "set",
+      "attr": null,
+      "nameJp": "オールインワンセット",
+      "category": "セット",
+      "release": "2026.10.10",
+      "price": "¥7,480",
+      "img": "_image/BX53_list.png",
+      "inCollection": false
+    },
+    {
+      "code": "BX-52",
+      "series": "BX",
+      "type": "starter",
+      "attr": "att",
+      "nameJp": "ラスタードラグーン6-60LC",
+      "category": "スターター",
+      "release": "2026.10.10",
+      "price": "¥2,300",
+      "img": "_image/BX52_list.png",
+      "inCollection": false
     },
     {
       "code": "CX-12",
