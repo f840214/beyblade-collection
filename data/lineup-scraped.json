@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-10-24T12:57:24.174Z",
+  "scrapedAt": "2026-10-25T13:24:08.777Z",
   "total": 148,
   "products": [
     {
@@ -183,6 +183,18 @@
       "inCollection": false
     },
     {
+      "code": "UX-00-SAMURAI",
+      "series": "UX",
+      "type": "starter",
+      "attr": "bal",
+      "nameJp": "サムライセイバー5-60K メタルコート:サムライブルー サッカー日本代表Ver.",
+      "category": "スターター",
+      "release": "2026.6.13",
+      "price": "¥2,500",
+      "img": "_image/BXG54_list2.png",
+      "inCollection": false
+    },
+    {
       "code": "CX-00-DB",
       "series": "CX",
       "type": "booster",
@@ -346,7 +358,7 @@
       "nameJp": "カスタマイズセットC",
       "category": "セット",
       "release": "2026.11.21",
-      "price": "¥6,600（��込）",
+      "price": "¥6,600",
       "img": "_image/CX20_list.png",
       "inCollection": false
     },
@@ -1765,18 +1777,6 @@
       "price": "¥1,980",
       "img": "_image/BX15_list.png",
       "inCollection": true
-    },
-    {
-      "code": "UX-00-SAMURAI",
-      "series": "UX",
-      "type": "starter",
-      "attr": "bal",
-      "nameJp": "サムライセイバー5-60K メタルコート:サムライブルー サッカー日本代表Ver.",
-      "category": "スターター",
-      "release": null,
-      "price": "¥2,500",
-      "img": "_image/BXG54_list2.png",
-      "inCollection": false
     }
   ]
 }
