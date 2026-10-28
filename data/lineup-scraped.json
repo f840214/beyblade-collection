@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-10-27T14:57:25.991Z",
+  "scrapedAt": "2026-10-28T15:32:37.577Z",
   "total": 148,
   "products": [
     {
@@ -187,7 +187,7 @@
       "series": "UX",
       "type": "starter",
       "attr": "bal",
-      "nameJp": "サムライセイバー5-60K メタ���コート:サムライブルー サッカー日本代表Ver.",
+      "nameJp": "サムライセイバー5-60K メタルコート:サムライブルー サッカー日本代表Ver.",
       "category": "スターター",
       "release": "2026.6.13",
       "price": "¥2,500",
@@ -1330,7 +1330,7 @@
       "nameJp": null,
       "category": "ブースター",
       "release": "2024.12.27",
-      "price": "¥1,600",
+      "price": "¥1,600（税込��",
       "img": "_image/BXG32_list.png",
       "inCollection": false
     },
