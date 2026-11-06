@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-11-05T16:54:01.970Z",
+  "scrapedAt": "2026-11-06T16:20:46.856Z",
   "total": 148,
   "products": [
     {
@@ -46,7 +46,7 @@
       "nameJp": "3on3デッキケース ブラックVer.",
       "category": "ツール",
       "release": "2026.8.8",
-      "price": "¥1,100",
+      "price": null,
       "img": "_image/BX57_list.png",
       "inCollection": false
     },
@@ -979,23 +979,11 @@
       "series": "UX",
       "type": "set",
       "attr": null,
-      "nameJp": "フェニックスラダ���デッキセット",
+      "nameJp": "フェニックスラダーデッキセット",
       "category": "セット",
       "release": "2024.8.10",
       "price": "¥4,100",
       "img": "_image/UX07_list.png",
-      "inCollection": true
-    },
-    {
-      "code": "UX-06",
-      "series": "UX",
-      "type": "booster",
-      "attr": "def",
-      "nameJp": "レオンクレスト7-60GN",
-      "category": "ブースター",
-      "release": "2024.8.10",
-      "price": "¥1,400",
-      "img": "_image/UX06_list.png",
       "inCollection": true
     },
     {
@@ -1776,6 +1764,18 @@
       "release": "2023.10.7",
       "price": "¥1,980",
       "img": "_image/BX15_list.png",
+      "inCollection": true
+    },
+    {
+      "code": "UX-06",
+      "series": "UX",
+      "type": "booster",
+      "attr": "def",
+      "nameJp": "レオンクレスト7-60GN",
+      "category": "ブースター",
+      "release": null,
+      "price": "¥1,400",
+      "img": "_image/UX06_list.png",
       "inCollection": true
     }
   ]
