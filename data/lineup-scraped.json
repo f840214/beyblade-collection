@@ -1,5 +1,5 @@
 {
-  "scrapedAt": "2026-11-07T15:14:10.022Z",
+  "scrapedAt": "2026-11-08T15:37:59.284Z",
   "total": 148,
   "products": [
     {
@@ -46,7 +46,7 @@
       "nameJp": "3on3デッキケース ブラックVer.",
       "category": "ツール",
       "release": "2026.8.8",
-      "price": null,
+      "price": "¥1,100",
       "img": "_image/BX57_list.png",
       "inCollection": false
     },
@@ -987,6 +987,18 @@
       "inCollection": true
     },
     {
+      "code": "UX-06",
+      "series": "UX",
+      "type": "booster",
+      "attr": "def",
+      "nameJp": "レオンクレスト7-60GN",
+      "category": "ブースター",
+      "release": "2024.8.10",
+      "price": "¥1,400",
+      "img": "_image/UX06_list.png",
+      "inCollection": true
+    },
+    {
       "code": "BX-00-DS3",
       "series": "BX",
       "type": "booster",
@@ -1764,18 +1776,6 @@
       "release": "2023.10.7",
       "price": "¥1,980",
       "img": "_image/BX15_list.png",
-      "inCollection": true
-    },
-    {
-      "code": "UX-06",
-      "series": "UX",
-      "type": "booster",
-      "attr": "def",
-      "nameJp": "レオンクレスト7-60GN",
-      "category": "ブースター",
-      "release": null,
-      "price": "¥1,400",
-      "img": "_image/UX06_list.png",
       "inCollection": true
     }
   ]
